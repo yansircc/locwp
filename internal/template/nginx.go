@@ -46,8 +46,8 @@ server {
     }
 }
 `, sc.Domain, sc.Domain, sc.WPRoot,
-		filepath.Join(sslDir, "_wildcard.local.pem"),
-		filepath.Join(sslDir, "_wildcard.local-key.pem"),
+		filepath.Join(sslDir, "_wildcard.loc.wp.pem"),
+		filepath.Join(sslDir, "_wildcard.loc.wp-key.pem"),
 		sc.SiteDir, sc.SiteDir, sc.Name)
 
 	return os.WriteFile(path, []byte(conf), 0644)

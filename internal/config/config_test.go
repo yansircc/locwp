@@ -28,7 +28,7 @@ func TestBaseDir_EnvOverride(t *testing.T) {
 
 func TestDomainExists_NoSites(t *testing.T) {
 	tmp := t.TempDir()
-	if DomainExists(tmp, "foo.local") {
+	if DomainExists(tmp, "foo.loc.wp") {
 		t.Error("DomainExists should return false when no sites dir exists")
 	}
 }
@@ -37,10 +37,10 @@ func TestDomainExists_Match(t *testing.T) {
 	tmp := t.TempDir()
 	siteDir := filepath.Join(tmp, "sites", "mysite")
 	os.MkdirAll(siteDir, 0755)
-	data, _ := json.Marshal(map[string]string{"domain": "mysite.local"})
+	data, _ := json.Marshal(map[string]string{"domain": "mysite.loc.wp"})
 	os.WriteFile(filepath.Join(siteDir, "config.json"), data, 0644)
 
-	if !DomainExists(tmp, "mysite.local") {
+	if !DomainExists(tmp, "mysite.loc.wp") {
 		t.Error("DomainExists should return true for existing domain")
 	}
 }
@@ -49,10 +49,10 @@ func TestDomainExists_NoMatch(t *testing.T) {
 	tmp := t.TempDir()
 	siteDir := filepath.Join(tmp, "sites", "mysite")
 	os.MkdirAll(siteDir, 0755)
-	data, _ := json.Marshal(map[string]string{"domain": "mysite.local"})
+	data, _ := json.Marshal(map[string]string{"domain": "mysite.loc.wp"})
 	os.WriteFile(filepath.Join(siteDir, "config.json"), data, 0644)
 
-	if DomainExists(tmp, "other.local") {
+	if DomainExists(tmp, "other.loc.wp") {
 		t.Error("DomainExists should return false for non-matching domain")
 	}
 }

@@ -8,7 +8,7 @@ import (
 func newTestConfig(dir string) *Config {
 	return &Config{
 		Name:    "testsite",
-		Domain:  "testsite.local",
+		Domain:  "testsite.loc.wp",
 		PHP:     "8.3",
 		WPVer:   "latest",
 		DBName:  "wp_testsite",

@@ -14,7 +14,7 @@ import (
 func testSiteConfig(dir string) *site.Config {
 	return &site.Config{
 		Name:       "demo",
-		Domain:     "demo.local",
+		Domain:     "demo.loc.wp",
 		PHP:        "8.2",
 		WPVer:      "6.4",
 		DBName:     "wp_demo",
@@ -86,7 +86,7 @@ func TestWriteNginxConf(t *testing.T) {
 
 	checks := []string{
 		"listen 443 ssl",
-		"server_name demo.local",
+		"server_name demo.loc.wp",
 		"ssl_certificate",
 		"return 301 https://",
 		"root " + sc.WPRoot,
@@ -163,8 +163,8 @@ func TestWritePawlWorkflows(t *testing.T) {
 		if vars["site"] != "demo" {
 			t.Errorf("%s vars.site = %q, want \"demo\"", f, vars["site"])
 		}
-		if vars["domain"] != "demo.local" {
-			t.Errorf("%s vars.domain = %q, want \"demo.local\"", f, vars["domain"])
+		if vars["domain"] != "demo.loc.wp" {
+			t.Errorf("%s vars.domain = %q, want \"demo.loc.wp\"", f, vars["domain"])
 		}
 
 		tasks, ok := raw["tasks"].(map[string]interface{})

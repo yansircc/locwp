@@ -45,7 +45,7 @@ var addCmd = &cobra.Command{
 		}
 
 		// Generate domain and check for duplicates
-		domain := name + ".local"
+		domain := name + ".loc.wp"
 		if config.DomainExists(baseDir, domain) {
 			return fmt.Errorf("domain %q is already in use", domain)
 		}

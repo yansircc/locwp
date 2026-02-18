@@ -61,7 +61,7 @@ func WritePawlWorkflows(workflowDir string, sc *site.Config) error {
 				{Name: "create-db", Run: "mariadb -u ${db_user} -e 'CREATE DATABASE IF NOT EXISTS `${db_name}`'", OnFail: "retry"},
 				{Name: "download-wp", Run: "php -d memory_limit=512M $(which wp) core download --path=${wp_root} --version=${wp_ver}", OnFail: "retry"},
 				{Name: "gen-wp-config", Run: "php -d memory_limit=512M $(which wp) config create --path=${wp_root} --dbname=${db_name} --dbuser=${db_user} --dbhost=${db_host} --skip-check"},
-				{Name: "provision-services", Run: "brew services restart php@${php_ver} 2>/dev/null; brew services start nginx 2>/dev/null; nginx -s reload", OnFail: "retry"},
+				{Name: "provision-services", Run: "brew services restart php@${php_ver} 2>/dev/null; sudo nginx -s reload", OnFail: "retry"},
 				{Name: "install-wp", Run: "php -d memory_limit=512M $(which wp) core install --path=${wp_root} --url=https://${domain} --title=${site} --admin_user=${admin_user} --admin_password=${admin_pass} --admin_email=${admin_email}", OnFail: "retry"},
 				{Name: "set-permalinks", Run: "php -d memory_limit=512M $(which wp) rewrite structure '/%postname%/' --path=${wp_root} && php -d memory_limit=512M $(which wp) rewrite flush --path=${wp_root}"},
 			},
@@ -69,16 +69,16 @@ func WritePawlWorkflows(workflowDir string, sc *site.Config) error {
 		"start": {
 			description: "Start WordPress site",
 			steps: []pawlStep{
-				{Name: "enable-vhost", Run: "mv ${vhost}.disabled ${vhost} 2>/dev/null || true"},
+				{Name: "enable-vhost", Run: "mv ${vhost}.disabled ${vhost} 2>/dev/null || true; ln -sf ${vhost} ${nginx_link}"},
 				{Name: "start-php", Run: "brew services start php@${php_ver}"},
-				{Name: "start-nginx", Run: "nginx -s reload"},
+				{Name: "start-nginx", Run: "sudo nginx -s reload"},
 			},
 		},
 		"stop": {
 			description: "Stop WordPress site",
 			steps: []pawlStep{
-				{Name: "disable-vhost", Run: "mv ${vhost} ${vhost}.disabled 2>/dev/null || true"},
-				{Name: "stop-nginx", Run: "nginx -s reload"},
+				{Name: "disable-vhost", Run: "mv ${vhost} ${vhost}.disabled 2>/dev/null || true; rm -f ${nginx_link}"},
+				{Name: "stop-nginx", Run: "sudo nginx -s reload || true"},
 			},
 		},
 		"destroy": {
@@ -87,7 +87,7 @@ func WritePawlWorkflows(workflowDir string, sc *site.Config) error {
 				{Name: "drop-db", Run: "mariadb -u ${db_user} -e 'DROP DATABASE IF EXISTS `${db_name}`'"},
 				{Name: "destroy-vhost", Run: "rm -f ${vhost} ${vhost}.disabled ${nginx_link}"},
 				{Name: "destroy-fpm", Run: "rm -f ${fpm_local} ${fpm_pool}"},
-				{Name: "destroy-reload", Run: "brew services restart php@${php_ver} 2>/dev/null; nginx -s reload"},
+				{Name: "destroy-reload", Run: "brew services restart php@${php_ver} 2>/dev/null; sudo nginx -s reload || true"},
 			},
 		},
 	}

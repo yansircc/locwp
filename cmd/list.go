@@ -26,12 +26,21 @@ var listCmd = &cobra.Command{
 			return err
 		}
 
+		// Filter to only directories
+		var dirs []os.DirEntry
+		for _, e := range entries {
+			if e.IsDir() {
+				dirs = append(dirs, e)
+			}
+		}
+		if len(dirs) == 0 {
+			fmt.Println("No sites yet. Run `locwp add <name>` to create one.")
+			return nil
+		}
+
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 		fmt.Fprintln(w, "NAME\tDOMAIN\tPHP\tSTATUS")
-		for _, e := range entries {
-			if !e.IsDir() {
-				continue
-			}
+		for _, e := range dirs {
 			sc, err := site.Load(filepath.Join(sitesDir, e.Name()))
 			if err != nil {
 				fmt.Fprintf(w, "%s\t-\t-\terror\n", e.Name())
