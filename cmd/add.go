@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -15,7 +16,6 @@ import (
 )
 
 var (
-	flagPort       int
 	flagPHP        string
 	flagNoStart    bool
 	flagAdminUser  string
@@ -23,12 +23,20 @@ var (
 	flagAdminEmail string
 )
 
+var namePattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
+
 var addCmd = &cobra.Command{
 	Use:   "add <name>",
 	Short: "Add a new local WordPress site",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
+
+		// Validate site name
+		if !namePattern.MatchString(name) {
+			return fmt.Errorf("invalid site name %q: only lowercase letters, digits, and hyphens allowed (cannot start/end with hyphen)", name)
+		}
+
 		baseDir := config.BaseDir()
 		siteDir := filepath.Join(baseDir, "sites", name)
 
@@ -36,14 +44,10 @@ var addCmd = &cobra.Command{
 			return fmt.Errorf("site %q already exists", name)
 		}
 
-		// Port: use flag or auto-assign
-		port := flagPort
-		if port == 0 {
-			p, err := config.NextPort(baseDir)
-			if err != nil {
-				return err
-			}
-			port = p
+		// Generate domain and check for duplicates
+		domain := name + ".local"
+		if config.DomainExists(baseDir, domain) {
+			return fmt.Errorf("domain %q is already in use", domain)
 		}
 
 		// DB user: current system user (Homebrew MariaDB default)
@@ -54,7 +58,7 @@ var addCmd = &cobra.Command{
 
 		sc := &site.Config{
 			Name:       name,
-			Port:       port,
+			Domain:     domain,
 			PHP:        flagPHP,
 			WPVer:      "latest",
 			DBName:     "wp_" + strings.ReplaceAll(name, "-", "_"),
@@ -122,7 +126,7 @@ var addCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Site %q configured (port %d, PHP %s)\n", name, port, flagPHP)
+		fmt.Printf("Site %q configured (https://%s, PHP %s)\n", name, domain, flagPHP)
 
 		if flagNoStart {
 			return nil
@@ -134,7 +138,6 @@ var addCmd = &cobra.Command{
 }
 
 func init() {
-	addCmd.Flags().IntVar(&flagPort, "port", 0, "Port number (auto-assigned from 8081)")
 	addCmd.Flags().StringVar(&flagPHP, "php", "8.3", "PHP version")
 	addCmd.Flags().BoolVar(&flagNoStart, "no-start", false, "Don't start provisioning immediately")
 	addCmd.Flags().StringVar(&flagAdminUser, "user", "admin", "WordPress admin username")

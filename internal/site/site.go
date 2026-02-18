@@ -13,7 +13,7 @@ import (
 
 type Config struct {
 	Name       string `json:"name"`
-	Port       int    `json:"port"`
+	Domain     string `json:"domain"`
 	PHP        string `json:"php"`
 	WPVer      string `json:"wp_version"`
 	DBName     string `json:"db_name"`
@@ -74,7 +74,7 @@ func Status(sc *Config) string {
 	if !VhostEnabled(sc.Name) {
 		return "stopped"
 	}
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", sc.Port), 500*time.Millisecond)
+	conn, err := net.DialTimeout("tcp", "127.0.0.1:443", 500*time.Millisecond)
 	if err != nil {
 		return "stopped"
 	}

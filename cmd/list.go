@@ -27,7 +27,7 @@ var listCmd = &cobra.Command{
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "NAME\tPORT\tPHP\tSTATUS")
+		fmt.Fprintln(w, "NAME\tDOMAIN\tPHP\tSTATUS")
 		for _, e := range entries {
 			if !e.IsDir() {
 				continue
@@ -38,7 +38,7 @@ var listCmd = &cobra.Command{
 				continue
 			}
 			status := site.Status(sc)
-			fmt.Fprintf(w, "%s\t%d\t%s\t%s\n", sc.Name, sc.Port, sc.PHP, status)
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", sc.Name, sc.Domain, sc.PHP, status)
 		}
 		return w.Flush()
 	},

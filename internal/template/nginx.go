@@ -3,16 +3,28 @@ package template
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
+	"github.com/yansircc/locwp/internal/config"
 	"github.com/yansircc/locwp/internal/site"
 )
 
 func WriteNginxConf(path string, sc *site.Config) error {
+	sslDir := config.SSLDir()
 	conf := fmt.Sprintf(`server {
-    listen %d;
-    server_name localhost;
+    listen 80;
+    server_name %s;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name %s;
     root %s;
     index index.php index.html;
+
+    ssl_certificate     %s;
+    ssl_certificate_key %s;
 
     access_log %s/logs/access.log;
     error_log  %s/logs/error.log;
@@ -33,7 +45,10 @@ func WriteNginxConf(path string, sc *site.Config) error {
         log_not_found off;
     }
 }
-`, sc.Port, sc.WPRoot, sc.SiteDir, sc.SiteDir, sc.Name)
+`, sc.Domain, sc.Domain, sc.WPRoot,
+		filepath.Join(sslDir, "_wildcard.local.pem"),
+		filepath.Join(sslDir, "_wildcard.local-key.pem"),
+		sc.SiteDir, sc.SiteDir, sc.Name)
 
 	return os.WriteFile(path, []byte(conf), 0644)
 }

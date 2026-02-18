@@ -2,7 +2,6 @@ package template
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -32,7 +31,7 @@ func WritePawlWorkflows(workflowDir string, sc *site.Config) error {
 
 	vars := map[string]string{
 		"site":        sc.Name,
-		"port":        fmt.Sprintf("%d", sc.Port),
+		"domain":      sc.Domain,
 		"db_name":     sc.DBName,
 		"db_user":     sc.DBUser,
 		"db_host":     sc.DBHost,
@@ -63,7 +62,7 @@ func WritePawlWorkflows(workflowDir string, sc *site.Config) error {
 				{Name: "download-wp", Run: "php -d memory_limit=512M $(which wp) core download --path=${wp_root} --version=${wp_ver}", OnFail: "retry"},
 				{Name: "gen-wp-config", Run: "php -d memory_limit=512M $(which wp) config create --path=${wp_root} --dbname=${db_name} --dbuser=${db_user} --dbhost=${db_host} --skip-check"},
 				{Name: "provision-services", Run: "brew services restart php@${php_ver} 2>/dev/null; brew services start nginx 2>/dev/null; nginx -s reload", OnFail: "retry"},
-				{Name: "install-wp", Run: "php -d memory_limit=512M $(which wp) core install --path=${wp_root} --url=localhost:${port} --title=${site} --admin_user=${admin_user} --admin_password=${admin_pass} --admin_email=${admin_email}", OnFail: "retry"},
+				{Name: "install-wp", Run: "php -d memory_limit=512M $(which wp) core install --path=${wp_root} --url=https://${domain} --title=${site} --admin_user=${admin_user} --admin_password=${admin_pass} --admin_email=${admin_email}", OnFail: "retry"},
 				{Name: "set-permalinks", Run: "php -d memory_limit=512M $(which wp) rewrite structure '/%postname%/' --path=${wp_root} && php -d memory_limit=512M $(which wp) rewrite flush --path=${wp_root}"},
 			},
 		},

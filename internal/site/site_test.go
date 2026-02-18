@@ -8,7 +8,7 @@ import (
 func newTestConfig(dir string) *Config {
 	return &Config{
 		Name:    "testsite",
-		Port:    8099,
+		Domain:  "testsite.local",
 		PHP:     "8.3",
 		WPVer:   "latest",
 		DBName:  "wp_testsite",
@@ -35,8 +35,8 @@ func TestSaveAndLoad(t *testing.T) {
 	if loaded.Name != sc.Name {
 		t.Errorf("Name = %q, want %q", loaded.Name, sc.Name)
 	}
-	if loaded.Port != sc.Port {
-		t.Errorf("Port = %d, want %d", loaded.Port, sc.Port)
+	if loaded.Domain != sc.Domain {
+		t.Errorf("Domain = %q, want %q", loaded.Domain, sc.Domain)
 	}
 	if loaded.PHP != sc.PHP {
 		t.Errorf("PHP = %q, want %q", loaded.PHP, sc.PHP)

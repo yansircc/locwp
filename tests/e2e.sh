@@ -68,6 +68,7 @@ test_add_defaults() {
   out=$("$BINARY" add testsite --no-start 2>&1)
 
   assert_contains "$out" "configured" "add outputs configured"
+  assert_contains "$out" "testsite.local" "add shows domain"
   assert_contains "$out" "8.3" "add shows default PHP"
 
   assert_file_exists "$LOCWP_HOME/sites/testsite/config.json" "config.json created"
@@ -75,11 +76,13 @@ test_add_defaults() {
   assert_file_exists "$LOCWP_HOME/php/testsite.conf" "FPM pool created"
   assert_file_exists "$LOCWP_HOME/sites/testsite/.pawl/workflows/provision.json" "pawl provision workflow created"
 
-  local name php
+  local name php domain
   name=$(python3 -c "import json; print(json.load(open('$LOCWP_HOME/sites/testsite/config.json'))['name'])")
   php=$(python3 -c "import json; print(json.load(open('$LOCWP_HOME/sites/testsite/config.json'))['php'])")
+  domain=$(python3 -c "import json; print(json.load(open('$LOCWP_HOME/sites/testsite/config.json'))['domain'])")
   assert_eq "$name" "testsite" "config name is testsite"
   assert_eq "$php" "8.3" "config php defaults to 8.3"
+  assert_eq "$domain" "testsite.local" "config domain is testsite.local"
 }
 
 # ─── Test: add with flags ────────────────────────────────
@@ -87,15 +90,15 @@ test_add_with_flags() {
   echo ""
   echo "=== test_add_with_flags ==="
   local out
-  out=$("$BINARY" add blog --port 9090 --php 8.2 --no-start 2>&1)
+  out=$("$BINARY" add blog --php 8.2 --no-start 2>&1)
 
-  assert_contains "$out" "9090" "add shows specified port"
+  assert_contains "$out" "blog.local" "add shows domain"
   assert_contains "$out" "8.2" "add shows specified PHP"
 
-  local port php
-  port=$(python3 -c "import json; print(json.load(open('$LOCWP_HOME/sites/blog/config.json'))['port'])")
+  local domain php
+  domain=$(python3 -c "import json; print(json.load(open('$LOCWP_HOME/sites/blog/config.json'))['domain'])")
   php=$(python3 -c "import json; print(json.load(open('$LOCWP_HOME/sites/blog/config.json'))['php'])")
-  assert_eq "$port" "9090" "config port is 9090"
+  assert_eq "$domain" "blog.local" "config domain is blog.local"
   assert_eq "$php" "8.2" "config php is 8.2"
 }
 
@@ -110,6 +113,31 @@ test_add_duplicate() {
   set -e
   if [[ $rc -ne 0 ]]; then pass "duplicate add returns error"; else fail "duplicate add should fail"; fi
   assert_contains "$out" "already exists" "duplicate add error message"
+}
+
+# ─── Test: add invalid name should fail ───────────────────
+test_add_invalid_name() {
+  echo ""
+  echo "=== test_add_invalid_name ==="
+  set +e
+  local out rc
+
+  # Name with dot
+  out=$("$BINARY" add "My.Site" --no-start 2>&1)
+  rc=$?
+  if [[ $rc -ne 0 ]]; then pass "dot in name rejected"; else fail "dot in name should be rejected"; fi
+
+  # Name with uppercase
+  out=$("$BINARY" add "MyBlog" --no-start 2>&1)
+  rc=$?
+  if [[ $rc -ne 0 ]]; then pass "uppercase in name rejected"; else fail "uppercase in name should be rejected"; fi
+
+  # Name starting with hyphen
+  out=$("$BINARY" add "-badname" --no-start 2>&1)
+  rc=$?
+  if [[ $rc -ne 0 ]]; then pass "leading hyphen rejected"; else fail "leading hyphen should be rejected"; fi
+
+  set -e
 }
 
 # ─── Test: list with sites ────────────────────────────────
@@ -222,6 +250,7 @@ test_list_empty
 test_add_defaults
 test_add_with_flags
 test_add_duplicate
+test_add_invalid_name
 test_list_with_sites
 test_ls_alias
 test_stop
