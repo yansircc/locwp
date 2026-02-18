@@ -63,43 +63,10 @@ func VhostPath(name string) string {
 	return filepath.Join(config.BaseDir(), "nginx", "sites", name+".conf")
 }
 
-// VhostDisabledPath returns the path to a disabled nginx vhost conf.
-func VhostDisabledPath(name string) string {
-	return filepath.Join(config.BaseDir(), "nginx", "sites", name+".conf.disabled")
-}
-
 // VhostEnabled reports whether the site's nginx vhost conf is enabled.
 func VhostEnabled(name string) bool {
 	_, err := os.Stat(VhostPath(name))
 	return err == nil
-}
-
-// EnableVhost renames <name>.conf.disabled back to <name>.conf.
-func EnableVhost(name string) error {
-	enabled := VhostPath(name)
-	disabled := VhostDisabledPath(name)
-
-	if _, err := os.Stat(enabled); err == nil {
-		return nil // already enabled
-	}
-	if _, err := os.Stat(disabled); err != nil {
-		return fmt.Errorf("vhost config not found for site %q", name)
-	}
-	return os.Rename(disabled, enabled)
-}
-
-// DisableVhost renames <name>.conf to <name>.conf.disabled.
-func DisableVhost(name string) error {
-	enabled := VhostPath(name)
-	disabled := VhostDisabledPath(name)
-
-	if _, err := os.Stat(disabled); err == nil {
-		return nil // already disabled
-	}
-	if _, err := os.Stat(enabled); err != nil {
-		return fmt.Errorf("vhost config not found for site %q", name)
-	}
-	return os.Rename(enabled, disabled)
 }
 
 // Status checks if a site is responding.

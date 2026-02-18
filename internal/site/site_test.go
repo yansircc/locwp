@@ -1,7 +1,6 @@
 package site
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 )
@@ -54,68 +53,6 @@ func TestLoad_NotExist(t *testing.T) {
 	_, err := Load(t.TempDir())
 	if err == nil {
 		t.Error("Load() on empty dir should error")
-	}
-}
-
-func TestVhostEnableDisable(t *testing.T) {
-	baseDir := t.TempDir()
-	t.Setenv("LOCWP_HOME", baseDir)
-
-	name := "mysite"
-	nginxDir := filepath.Join(baseDir, "nginx", "sites")
-	os.MkdirAll(nginxDir, 0755)
-
-	// Create an enabled vhost
-	confPath := filepath.Join(nginxDir, name+".conf")
-	os.WriteFile(confPath, []byte("server {}"), 0644)
-
-	// Should be enabled
-	if !VhostEnabled(name) {
-		t.Error("VhostEnabled() = false after creating .conf")
-	}
-
-	// Disable it
-	if err := DisableVhost(name); err != nil {
-		t.Fatalf("DisableVhost() error: %v", err)
-	}
-	if VhostEnabled(name) {
-		t.Error("VhostEnabled() = true after DisableVhost()")
-	}
-
-	// .conf.disabled should exist
-	if _, err := os.Stat(filepath.Join(nginxDir, name+".conf.disabled")); err != nil {
-		t.Error(".conf.disabled file not found after DisableVhost()")
-	}
-
-	// Disable again should be idempotent
-	if err := DisableVhost(name); err != nil {
-		t.Fatalf("DisableVhost() second call error: %v", err)
-	}
-
-	// Re-enable
-	if err := EnableVhost(name); err != nil {
-		t.Fatalf("EnableVhost() error: %v", err)
-	}
-	if !VhostEnabled(name) {
-		t.Error("VhostEnabled() = false after EnableVhost()")
-	}
-
-	// Enable again should be idempotent
-	if err := EnableVhost(name); err != nil {
-		t.Fatalf("EnableVhost() second call error: %v", err)
-	}
-}
-
-func TestVhostEnable_NoFile(t *testing.T) {
-	baseDir := t.TempDir()
-	t.Setenv("LOCWP_HOME", baseDir)
-
-	nginxDir := filepath.Join(baseDir, "nginx", "sites")
-	os.MkdirAll(nginxDir, 0755)
-
-	err := EnableVhost("nonexistent")
-	if err == nil {
-		t.Error("EnableVhost() should error when no conf file exists")
 	}
 }
 

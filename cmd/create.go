@@ -112,12 +112,12 @@ var addCmd = &cobra.Command{
 			}
 		}
 
-		// Generate pawl workflow
-		pawlDir := filepath.Join(siteDir, ".pawl")
-		if err := os.MkdirAll(pawlDir, 0755); err != nil {
+		// Generate pawl workflows
+		workflowDir := filepath.Join(siteDir, ".pawl", "workflows")
+		if err := os.MkdirAll(workflowDir, 0755); err != nil {
 			return err
 		}
-		if err := template.WritePawlConfig(filepath.Join(pawlDir, "config.json"), sc); err != nil {
+		if err := template.WritePawlWorkflows(workflowDir, sc); err != nil {
 			return err
 		}
 
@@ -127,8 +127,8 @@ var addCmd = &cobra.Command{
 			return nil
 		}
 
-		// Run pawl workflow
-		return exec.RunInDir(siteDir, "pawl", "start", name)
+		// Run provision workflow
+		return exec.RunInDir(siteDir, "pawl", "start", "provision")
 	},
 }
 

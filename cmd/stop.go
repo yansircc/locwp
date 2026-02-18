@@ -18,12 +18,8 @@ var stopCmd = &cobra.Command{
 			return err
 		}
 
-		if err := site.DisableVhost(sc.Name); err != nil {
-			return fmt.Errorf("failed to disable vhost: %w", err)
-		}
-
-		if err := exec.Run("nginx", "-s", "reload"); err != nil {
-			return fmt.Errorf("nginx reload failed: %w", err)
+		if err := exec.RunInDir(sc.SiteDir, "pawl", "start", "stop"); err != nil {
+			return err
 		}
 
 		fmt.Printf("Site %q stopped\n", sc.Name)

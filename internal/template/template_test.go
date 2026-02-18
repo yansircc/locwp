@@ -13,15 +13,18 @@ import (
 
 func testSiteConfig(dir string) *site.Config {
 	return &site.Config{
-		Name:    "demo",
-		Port:    8081,
-		PHP:     "8.2",
-		WPVer:   "6.4",
-		DBName:  "wp_demo",
-		DBUser:  "root",
-		DBHost:  "127.0.0.1",
-		SiteDir: dir,
-		WPRoot:  filepath.Join(dir, "wordpress"),
+		Name:       "demo",
+		Port:       8081,
+		PHP:        "8.2",
+		WPVer:      "6.4",
+		DBName:     "wp_demo",
+		DBUser:     "root",
+		DBHost:     "127.0.0.1",
+		SiteDir:    filepath.Join(dir, "sites", "demo"),
+		WPRoot:     filepath.Join(dir, "sites", "demo", "wordpress"),
+		AdminUser:  "admin",
+		AdminPass:  "admin",
+		AdminEmail: "admin@local.test",
 	}
 }
 
@@ -85,7 +88,7 @@ func TestWriteNginxConf(t *testing.T) {
 		"listen 8081",
 		"root " + sc.WPRoot,
 		"fastcgi_pass unix:/tmp/locwp-demo.sock",
-		"access_log " + dir + "/logs/access.log",
+		"access_log " + sc.SiteDir + "/logs/access.log",
 		"try_files",
 		"index.php",
 	}
@@ -126,64 +129,62 @@ func TestWriteFPMPool(t *testing.T) {
 	}
 }
 
-func TestWritePawlConfig(t *testing.T) {
+func TestWritePawlWorkflows(t *testing.T) {
 	dir := t.TempDir()
 	sc := testSiteConfig(dir)
-	outPath := filepath.Join(dir, "config.json")
+	workflowDir := filepath.Join(dir, "workflows")
+	os.MkdirAll(workflowDir, 0755)
 
-	if err := WritePawlConfig(outPath, sc); err != nil {
-		t.Fatalf("WritePawlConfig() error: %v", err)
-	}
-
-	data, err := os.ReadFile(outPath)
-	if err != nil {
-		t.Fatalf("ReadFile() error: %v", err)
+	if err := WritePawlWorkflows(workflowDir, sc); err != nil {
+		t.Fatalf("WritePawlWorkflows() error: %v", err)
 	}
 
-	// Should be valid JSON
-	var raw map[string]interface{}
-	if err := json.Unmarshal(data, &raw); err != nil {
-		t.Fatalf("pawl config is not valid JSON: %v", err)
-	}
+	expectedFiles := []string{"provision.json", "start.json", "stop.json", "destroy.json"}
+	for _, f := range expectedFiles {
+		path := filepath.Join(workflowDir, f)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("%s not found: %v", f, err)
+		}
 
-	// Check vars
-	vars, ok := raw["vars"].(map[string]interface{})
-	if !ok {
-		t.Fatal("pawl config missing 'vars'")
-	}
-	if vars["site"] != "demo" {
-		t.Errorf("vars.site = %q, want \"demo\"", vars["site"])
-	}
-	if vars["port"] != "8081" {
-		t.Errorf("vars.port = %q, want \"8081\"", vars["port"])
-	}
-	if vars["db_name"] != "wp_demo" {
-		t.Errorf("vars.db_name = %q, want \"wp_demo\"", vars["db_name"])
-	}
+		var raw map[string]interface{}
+		if err := json.Unmarshal(data, &raw); err != nil {
+			t.Fatalf("%s is not valid JSON: %v", f, err)
+		}
 
-	// Check workflow steps
-	workflow, ok := raw["workflow"].([]interface{})
-	if !ok {
-		t.Fatal("pawl config missing 'workflow'")
-	}
+		// All workflows must have vars and workflow
+		vars, ok := raw["vars"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("%s missing 'vars'", f)
+		}
+		if vars["site"] != "demo" {
+			t.Errorf("%s vars.site = %q, want \"demo\"", f, vars["site"])
+		}
+		if vars["port"] != "8081" {
+			t.Errorf("%s vars.port = %q, want \"8081\"", f, vars["port"])
+		}
 
-	expectedSteps := []string{
-		"check-deps", "create-db", "download-wp",
-		"gen-wp-config", "reload-services", "install-wp", "verify",
-	}
-	if len(workflow) != len(expectedSteps) {
-		t.Fatalf("workflow has %d steps, want %d", len(workflow), len(expectedSteps))
-	}
-	for i, step := range workflow {
-		s := step.(map[string]interface{})
-		if s["name"] != expectedSteps[i] {
-			t.Errorf("workflow[%d].name = %q, want %q", i, s["name"], expectedSteps[i])
+		workflow, ok := raw["workflow"].([]interface{})
+		if !ok || len(workflow) == 0 {
+			t.Fatalf("%s missing or empty 'workflow'", f)
 		}
 	}
 
-	// Verify step should have "verify": "manual"
-	lastStep := workflow[len(workflow)-1].(map[string]interface{})
-	if lastStep["verify"] != "manual" {
-		t.Error("last step should have verify=manual")
+	// Spot-check provision workflow has install-wp step
+	data, _ := os.ReadFile(filepath.Join(workflowDir, "provision.json"))
+	if !strings.Contains(string(data), "install-wp") {
+		t.Error("provision.json missing install-wp step")
+	}
+
+	// Spot-check destroy workflow has drop-db step
+	data, _ = os.ReadFile(filepath.Join(workflowDir, "destroy.json"))
+	if !strings.Contains(string(data), "drop-db") {
+		t.Error("destroy.json missing drop-db step")
+	}
+
+	// Check path vars are populated
+	data, _ = os.ReadFile(filepath.Join(workflowDir, "start.json"))
+	if !strings.Contains(string(data), "nginx") {
+		t.Error("start.json missing nginx-related path in vars")
 	}
 }

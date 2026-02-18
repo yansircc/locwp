@@ -73,7 +73,7 @@ test_add_defaults() {
   assert_file_exists "$LOCWP_HOME/sites/testsite/config.json" "config.json created"
   assert_file_exists "$LOCWP_HOME/nginx/sites/testsite.conf" "nginx vhost created"
   assert_file_exists "$LOCWP_HOME/php/testsite.conf" "FPM pool created"
-  assert_file_exists "$LOCWP_HOME/sites/testsite/.pawl/config.json" "pawl config created"
+  assert_file_exists "$LOCWP_HOME/sites/testsite/.pawl/workflows/provision.json" "pawl provision workflow created"
 
   local name php
   name=$(python3 -c "import json; print(json.load(open('$LOCWP_HOME/sites/testsite/config.json'))['name'])")

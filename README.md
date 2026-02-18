@@ -2,6 +2,8 @@
 
 Local WordPress site manager for macOS. Create and manage WordPress development sites using native Homebrew services (PHP, MariaDB, Nginx).
 
+Built on [pawl](https://github.com/yansircc/pawl) — all site lifecycle operations (provision, start, stop, destroy) are declarative JSON workflows that pawl executes with built-in retry, progress display, and error handling.
+
 ## Features
 
 - One-command WordPress site provisioning
@@ -9,11 +11,12 @@ Local WordPress site manager for macOS. Create and manage WordPress development 
 - Auto-configured Nginx vhosts and PHP-FPM pools
 - Start/stop individual sites without affecting others
 - WP-CLI passthrough for each site
-- Integrated [pawl](https://github.com/yansircc/pawl) workflow for automated setup
+- Customizable pawl workflows per site
 
 ## Requirements
 
 - macOS with [Homebrew](https://brew.sh)
+- [pawl](https://github.com/yansircc/pawl) (`cargo install pawl`)
 - Go 1.23+ (for building from source)
 
 ## Install
@@ -64,21 +67,25 @@ locwp setup --php 8.2         # Install a specific PHP version
 
 ## How It Works
 
-`locwp` manages WordPress sites using native macOS services:
+`locwp` generates config files and pawl workflows, then delegates all execution to pawl:
 
 ```
 ~/.locwp/
   sites/
     mysite/
-      config.json          # Site configuration
-      wordpress/           # WordPress files
-      logs/                # Nginx & PHP logs
-      .pawl/config.json    # Provisioning workflow
+      config.json                    # Site configuration
+      wordpress/                     # WordPress files
+      logs/                          # Nginx & PHP logs
+      .pawl/workflows/
+        provision.json               # Initial setup workflow
+        start.json                   # Start site workflow
+        stop.json                    # Stop site workflow
+        destroy.json                 # Teardown workflow
   nginx/
     sites/
-      mysite.conf          # Nginx vhost
+      mysite.conf                    # Nginx vhost
   php/
-    mysite.conf            # PHP-FPM pool
+    mysite.conf                      # PHP-FPM pool
 ```
 
 Each site gets:
@@ -86,6 +93,9 @@ Each site gets:
 - A dedicated PHP-FPM pool with Unix socket
 - A MariaDB database (`wp_<name>`)
 - WordPress admin credentials (default: `admin` / `admin`)
+- Four pawl workflows for its full lifecycle
+
+Workflows are plain JSON files — you can edit them to add custom steps (install plugins, import data, configure themes) without recompiling locwp.
 
 ### Environment Variables
 
@@ -110,7 +120,7 @@ Each site gets:
 # Unit tests
 go test ./...
 
-# E2E tests
+# E2E tests (requires pawl)
 bash tests/e2e.sh
 ```
 

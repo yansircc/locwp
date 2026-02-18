@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/yansircc/locwp/internal/site"
 )
@@ -20,69 +21,66 @@ type pawlStep struct {
 	Verify string `json:"verify,omitempty"`
 }
 
-func WritePawlConfig(path string, sc *site.Config) error {
-	cfg := pawlConfig{
-		Vars: map[string]string{
-			"site":        sc.Name,
-			"port":        intToStr(sc.Port),
-			"db_name":     sc.DBName,
-			"db_user":     sc.DBUser,
-			"db_host":     sc.DBHost,
-			"wp_root":     sc.WPRoot,
-			"wp_ver":      sc.WPVer,
-			"php_ver":     sc.PHP,
-			"site_dir":    sc.SiteDir,
-			"admin_user":  sc.AdminUser,
-			"admin_pass":  sc.AdminPass,
-			"admin_email": sc.AdminEmail,
+// WritePawlWorkflows generates all lifecycle workflow files under workflowDir.
+func WritePawlWorkflows(workflowDir string, sc *site.Config) error {
+	baseDir := filepath.Dir(filepath.Dir(sc.SiteDir))
+	vhost := filepath.Join(baseDir, "nginx", "sites", sc.Name+".conf")
+
+	vars := map[string]string{
+		"site":        sc.Name,
+		"port":        fmt.Sprintf("%d", sc.Port),
+		"db_name":     sc.DBName,
+		"db_user":     sc.DBUser,
+		"db_host":     sc.DBHost,
+		"wp_root":     sc.WPRoot,
+		"wp_ver":      sc.WPVer,
+		"php_ver":     sc.PHP,
+		"site_dir":    sc.SiteDir,
+		"admin_user":  sc.AdminUser,
+		"admin_pass":  sc.AdminPass,
+		"admin_email": sc.AdminEmail,
+		"vhost":       vhost,
+		"nginx_link":  filepath.Join(HomebrewPrefix(), "etc", "nginx", "servers", "locwp-"+sc.Name+".conf"),
+		"fpm_local":   filepath.Join(baseDir, "php", sc.Name+".conf"),
+		"fpm_pool":    filepath.Join(FPMPoolDir(sc.PHP), "locwp-"+sc.Name+".conf"),
+	}
+
+	workflows := map[string][]pawlStep{
+		"provision": {
+			{Name: "check-deps", Run: "which php nginx mariadb wp"},
+			{Name: "create-db", Run: "mariadb -u ${db_user} -e 'CREATE DATABASE IF NOT EXISTS ${db_name}'", OnFail: "retry"},
+			{Name: "download-wp", Run: "php -d memory_limit=512M $(which wp) core download --path=${wp_root} --version=${wp_ver}", OnFail: "retry"},
+			{Name: "gen-wp-config", Run: "php -d memory_limit=512M $(which wp) config create --path=${wp_root} --dbname=${db_name} --dbuser=${db_user} --dbhost=${db_host} --skip-check"},
+			{Name: "provision-services", Run: "brew services start php@${php_ver} 2>/dev/null; brew services start nginx 2>/dev/null; nginx -s reload", OnFail: "retry"},
+			{Name: "install-wp", Run: "php -d memory_limit=512M $(which wp) core install --path=${wp_root} --url=localhost:${port} --title=${site} --admin_user=${admin_user} --admin_password=${admin_pass} --admin_email=${admin_email}", OnFail: "retry"},
+			{Name: "provision-verify", Verify: "manual"},
 		},
-		Workflow: []pawlStep{
-			{
-				Name: "check-deps",
-				Run:  "which php nginx mariadb wp",
-			},
-			{
-				Name:   "create-db",
-				Run:    "mariadb -u ${db_user} -e 'CREATE DATABASE IF NOT EXISTS ${db_name}'",
-				OnFail: "retry",
-			},
-			{
-				Name:   "download-wp",
-				Run:    downloadCmd(),
-				OnFail: "retry",
-			},
-			{
-				Name: "gen-wp-config",
-				Run:  "php -d memory_limit=512M $(which wp) config create --path=${wp_root} --dbname=${db_name} --dbuser=${db_user} --dbhost=${db_host} --skip-check",
-			},
-			{
-				Name:   "reload-services",
-				Run:    "brew services start php@${php_ver} 2>/dev/null; brew services start nginx 2>/dev/null; nginx -s reload",
-				OnFail: "retry",
-			},
-			{
-				Name:   "install-wp",
-				Run:    "php -d memory_limit=512M $(which wp) core install --path=${wp_root} --url=localhost:${port} --title=${site} --admin_user=${admin_user} --admin_password=${admin_pass} --admin_email=${admin_email}",
-				OnFail: "retry",
-			},
-			{
-				Name:   "verify",
-				Verify: "manual",
-			},
+		"start": {
+			{Name: "enable-vhost", Run: "mv ${vhost}.disabled ${vhost} 2>/dev/null || true"},
+			{Name: "start-php", Run: "brew services start php@${php_ver}"},
+			{Name: "start-nginx", Run: "nginx -s reload"},
+		},
+		"stop": {
+			{Name: "disable-vhost", Run: "mv ${vhost} ${vhost}.disabled 2>/dev/null || true"},
+			{Name: "stop-nginx", Run: "nginx -s reload"},
+		},
+		"destroy": {
+			{Name: "drop-db", Run: "mariadb -u ${db_user} -e 'DROP DATABASE IF EXISTS ${db_name}'"},
+			{Name: "destroy-vhost", Run: "rm -f ${vhost} ${vhost}.disabled ${nginx_link}"},
+			{Name: "destroy-fpm", Run: "rm -f ${fpm_local} ${fpm_pool}"},
+			{Name: "destroy-nginx", Run: "nginx -s reload"},
 		},
 	}
 
-	data, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return err
+	for name, steps := range workflows {
+		cfg := pawlConfig{Vars: vars, Workflow: steps}
+		data, err := json.MarshalIndent(cfg, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(workflowDir, name+".json"), data, 0644); err != nil {
+			return err
+		}
 	}
-	return os.WriteFile(path, data, 0644)
-}
-
-func downloadCmd() string {
-	return "php -d memory_limit=512M $(which wp) core download --path=${wp_root} --version=${wp_ver}"
-}
-
-func intToStr(n int) string {
-	return fmt.Sprintf("%d", n)
+	return nil
 }
