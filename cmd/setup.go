@@ -127,7 +127,7 @@ var setupCmd = &cobra.Command{
 		}
 
 		// --- Phase 2: Operations requiring sudo (grouped at the end) ---
-		fmt.Println("\n需要管理员权限来完成以下操作...")
+		fmt.Println("\nAdmin privileges required for the following operations...")
 
 		// Create /etc/resolver/wp for macOS DNS resolution
 		resolverDir := "/etc/resolver"
@@ -218,6 +218,6 @@ http {
 }
 
 func init() {
-	setupCmd.Flags().StringVar(&flagSetupPHP, "php", "8.3", "PHP version to install (e.g. 8.1, 8.2, 8.3)")
+	setupCmd.Flags().StringVar(&flagSetupPHP, "php", config.DefaultPHP, "PHP version to install (e.g. 8.1, 8.2, 8.3)")
 	rootCmd.AddCommand(setupCmd)
 }

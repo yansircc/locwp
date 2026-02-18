@@ -138,10 +138,10 @@ var addCmd = &cobra.Command{
 }
 
 func init() {
-	addCmd.Flags().StringVar(&flagPHP, "php", "8.3", "PHP version")
+	addCmd.Flags().StringVar(&flagPHP, "php", config.DefaultPHP, "PHP version")
 	addCmd.Flags().BoolVar(&flagNoStart, "no-start", false, "Don't start provisioning immediately")
 	addCmd.Flags().StringVar(&flagAdminUser, "user", "admin", "WordPress admin username")
 	addCmd.Flags().StringVar(&flagAdminPass, "pass", "admin", "WordPress admin password")
-	addCmd.Flags().StringVar(&flagAdminEmail, "email", "admin@local.test", "WordPress admin email")
+	addCmd.Flags().StringVar(&flagAdminEmail, "email", "admin@loc.wp", "WordPress admin email")
 	rootCmd.AddCommand(addCmd)
 }

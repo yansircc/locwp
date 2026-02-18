@@ -8,6 +8,9 @@ import (
 
 const dirName = ".locwp"
 
+// DefaultPHP is the default PHP version used across setup and add commands.
+const DefaultPHP = "8.3"
+
 // BaseDir returns the locwp data directory, creating it if needed.
 // Honors LOCWP_HOME env var, defaults to ~/.locwp.
 func BaseDir() string {

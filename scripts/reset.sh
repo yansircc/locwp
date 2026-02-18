@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# reset.sh — 还原 locwp 到全新状态（保留 brew 包）
+# reset.sh — reset locwp to a clean state (keeps brew packages)
 set -euo pipefail
 
 LOCWP_HOME="${LOCWP_HOME:-$HOME/.locwp}"
@@ -10,21 +10,21 @@ echo "=== locwp reset ==="
 echo "  LOCWP_HOME: $LOCWP_HOME"
 echo "  BREW_PREFIX: $BREW_PREFIX"
 
-# 1. 停止 root 级别的服务
+# 1. Stop root-level services
 echo ""
-echo "--- 停止系统服务 ---"
+echo "--- Stopping system services ---"
 sudo brew services stop nginx 2>/dev/null || true
 sudo nginx -s quit 2>/dev/null || true
 sudo pkill -9 nginx 2>/dev/null || true
 sleep 1
-# 确认无残留进程
+# Ensure no lingering processes
 sudo pkill -9 nginx 2>/dev/null || true
 sudo brew services stop dnsmasq 2>/dev/null || true
 sleep 1
 
-# 2. 遍历 sites，DROP 对应数据库
+# 2. Iterate sites and DROP corresponding databases
 echo ""
-echo "--- 清理数据库 ---"
+echo "--- Cleaning up databases ---"
 if [[ -d "$LOCWP_HOME/sites" ]]; then
   for cfg in "$LOCWP_HOME"/sites/*/config.json; do
     [[ -f "$cfg" ]] || continue
@@ -35,59 +35,59 @@ if [[ -d "$LOCWP_HOME/sites" ]]; then
     fi
   done
 else
-  echo "  (无站点目录)"
+  echo "  (no sites directory)"
 fi
 
-# 3. 删除 ~/.locwp/ 整个目录
+# 3. Remove the entire ~/.locwp/ directory
 echo ""
-echo "--- 删除 $LOCWP_HOME ---"
+echo "--- Removing $LOCWP_HOME ---"
 rm -rf "$LOCWP_HOME"
 
-# 4. 删除 nginx 服务器配置
+# 4. Remove nginx server configs
 echo ""
-echo "--- 清理 nginx 配置 ---"
+echo "--- Cleaning up nginx configs ---"
 rm -f "$BREW_PREFIX"/etc/nginx/servers/locwp-* 2>/dev/null || true
 
-# 5. 删除 FPM pool 配置（包括旧格式 wp-local-*）
+# 5. Remove FPM pool configs (including legacy wp-local-* format)
 echo ""
-echo "--- 清理 PHP-FPM pool 配置 ---"
+echo "--- Cleaning up PHP-FPM pool configs ---"
 rm -f "$BREW_PREFIX"/etc/php/"$PHP_VER"/php-fpm.d/locwp-* 2>/dev/null || true
 rm -f "$BREW_PREFIX"/etc/php/"$PHP_VER"/php-fpm.d/wp-local-* 2>/dev/null || true
 
-# 6. 删除 /etc/resolver/wp
+# 6. Remove /etc/resolver/wp
 echo ""
-echo "--- 清理 DNS resolver ---"
+echo "--- Cleaning up DNS resolver ---"
 sudo rm -f /etc/resolver/wp 2>/dev/null || true
 
-# 7. 删除 /etc/sudoers.d/locwp
+# 7. Remove /etc/sudoers.d/locwp
 echo ""
-echo "--- 清理 sudoers ---"
+echo "--- Cleaning up sudoers ---"
 sudo rm -f /etc/sudoers.d/locwp 2>/dev/null || true
 
-# 8. 从 dnsmasq.conf 中移除 locwp 行
+# 8. Remove locwp lines from dnsmasq.conf
 echo ""
-echo "--- 清理 dnsmasq 配置 ---"
+echo "--- Cleaning up dnsmasq config ---"
 DNSMASQ_CONF="$BREW_PREFIX/etc/dnsmasq.conf"
 if [[ -f "$DNSMASQ_CONF" ]]; then
-  # 移除包含 .loc.wp 的行
+  # Remove lines containing .loc.wp
   sudo sed -i '' '/\.loc\.wp/d' "$DNSMASQ_CONF" 2>/dev/null || true
-  echo "  已清理 dnsmasq.conf"
+  echo "  cleaned dnsmasq.conf"
 else
-  echo "  (dnsmasq.conf 不存在)"
+  echo "  (dnsmasq.conf not found)"
 fi
 
-# 9. 恢复 nginx.conf（setup 会覆盖，这里不做）
+# 9. Restore nginx.conf (setup will overwrite, skip here)
 echo ""
-echo "--- 跳过 nginx.conf 恢复（setup 会覆盖）---"
+echo "--- Skipping nginx.conf restore (setup will overwrite) ---"
 
-# 10. 重启用户级服务
+# 10. Restart user-level services
 echo ""
-echo "--- 重启用户级服务 ---"
+echo "--- Restarting user-level services ---"
 brew services restart mariadb 2>/dev/null || true
 brew services restart "php@$PHP_VER" 2>/dev/null || true
 
-# 等待 MariaDB 就绪
-echo -n "  等待 MariaDB 就绪"
+# Wait for MariaDB to be ready
+echo -n "  Waiting for MariaDB"
 for i in $(seq 1 15); do
   if mariadb -e "SELECT 1" &>/dev/null; then
     echo " OK"
@@ -98,4 +98,4 @@ for i in $(seq 1 15); do
 done
 
 echo ""
-echo "=== Reset 完成 ==="
+echo "=== Reset complete ==="

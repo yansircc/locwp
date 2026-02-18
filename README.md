@@ -1,4 +1,4 @@
-# locwp
+# LOCWP
 
 Local WordPress site manager for macOS. Create and manage WordPress development sites with HTTPS, custom domains, and zero configuration — all powered by native Homebrew services.
 
@@ -88,7 +88,7 @@ Site names: lowercase letters, digits, and hyphens. Cannot start or end with a h
 | `--php` | PHP version | `8.3` |
 | `--user` | WordPress admin username | `admin` |
 | `--pass` | WordPress admin password | `admin` |
-| `--email` | WordPress admin email | `admin@local.test` |
+| `--email` | WordPress admin email | `admin@loc.wp` |
 | `--no-start` | Skip provisioning | `false` |
 
 ### Manage sites

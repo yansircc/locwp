@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/yansircc/locwp/internal/config"
 	"github.com/yansircc/locwp/internal/site"
 )
 
@@ -22,7 +23,7 @@ func HomebrewPrefix() string {
 // For other versions, it returns "php@X.Y".
 func PHPFormulaName(version string) string {
 	if version == "" {
-		version = "8.3"
+		version = config.DefaultPHP
 	}
 	return "php@" + version
 }

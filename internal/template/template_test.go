@@ -24,7 +24,7 @@ func testSiteConfig(dir string) *site.Config {
 		WPRoot:     filepath.Join(dir, "sites", "demo", "wordpress"),
 		AdminUser:  "admin",
 		AdminPass:  "admin",
-		AdminEmail: "admin@local.test",
+		AdminEmail: "admin@loc.wp",
 	}
 }
 
