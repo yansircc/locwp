@@ -152,7 +152,7 @@ func TestWritePawlWorkflows(t *testing.T) {
 			t.Fatalf("%s is not valid JSON: %v", f, err)
 		}
 
-		// All workflows must have vars and workflow
+		// All workflows must have vars, tasks, and workflow
 		vars, ok := raw["vars"].(map[string]interface{})
 		if !ok {
 			t.Fatalf("%s missing 'vars'", f)
@@ -164,16 +164,28 @@ func TestWritePawlWorkflows(t *testing.T) {
 			t.Errorf("%s vars.port = %q, want \"8081\"", f, vars["port"])
 		}
 
+		tasks, ok := raw["tasks"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("%s missing 'tasks'", f)
+		}
+		taskName := strings.TrimSuffix(f, ".json")
+		if _, ok := tasks[taskName]; !ok {
+			t.Errorf("%s tasks missing key %q", f, taskName)
+		}
+
 		workflow, ok := raw["workflow"].([]interface{})
 		if !ok || len(workflow) == 0 {
 			t.Fatalf("%s missing or empty 'workflow'", f)
 		}
 	}
 
-	// Spot-check provision workflow has install-wp step
+	// Spot-check provision workflow has install-wp and set-permalinks steps
 	data, _ := os.ReadFile(filepath.Join(workflowDir, "provision.json"))
 	if !strings.Contains(string(data), "install-wp") {
 		t.Error("provision.json missing install-wp step")
+	}
+	if !strings.Contains(string(data), "set-permalinks") {
+		t.Error("provision.json missing set-permalinks step")
 	}
 
 	// Spot-check destroy workflow has drop-db step

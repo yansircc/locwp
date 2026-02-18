@@ -10,15 +10,19 @@ import (
 )
 
 type pawlConfig struct {
-	Vars     map[string]string `json:"vars"`
-	Workflow []pawlStep        `json:"workflow"`
+	Vars     map[string]string          `json:"vars"`
+	Tasks    map[string]pawlTaskDecl    `json:"tasks"`
+	Workflow []pawlStep                 `json:"workflow"`
+}
+
+type pawlTaskDecl struct {
+	Description string `json:"description,omitempty"`
 }
 
 type pawlStep struct {
 	Name   string `json:"name"`
 	Run    string `json:"run,omitempty"`
 	OnFail string `json:"on_fail,omitempty"`
-	Verify string `json:"verify,omitempty"`
 }
 
 // WritePawlWorkflows generates all lifecycle workflow files under workflowDir.
@@ -45,35 +49,58 @@ func WritePawlWorkflows(workflowDir string, sc *site.Config) error {
 		"fpm_pool":    filepath.Join(FPMPoolDir(sc.PHP), "locwp-"+sc.Name+".conf"),
 	}
 
-	workflows := map[string][]pawlStep{
+	type workflowDef struct {
+		description string
+		steps       []pawlStep
+	}
+
+	workflows := map[string]workflowDef{
 		"provision": {
-			{Name: "check-deps", Run: "which php nginx mariadb wp"},
-			{Name: "create-db", Run: "mariadb -u ${db_user} -e 'CREATE DATABASE IF NOT EXISTS ${db_name}'", OnFail: "retry"},
-			{Name: "download-wp", Run: "php -d memory_limit=512M $(which wp) core download --path=${wp_root} --version=${wp_ver}", OnFail: "retry"},
-			{Name: "gen-wp-config", Run: "php -d memory_limit=512M $(which wp) config create --path=${wp_root} --dbname=${db_name} --dbuser=${db_user} --dbhost=${db_host} --skip-check"},
-			{Name: "provision-services", Run: "brew services start php@${php_ver} 2>/dev/null; brew services start nginx 2>/dev/null; nginx -s reload", OnFail: "retry"},
-			{Name: "install-wp", Run: "php -d memory_limit=512M $(which wp) core install --path=${wp_root} --url=localhost:${port} --title=${site} --admin_user=${admin_user} --admin_password=${admin_pass} --admin_email=${admin_email}", OnFail: "retry"},
-			{Name: "provision-verify", Verify: "manual"},
+			description: "Provision WordPress site",
+			steps: []pawlStep{
+				{Name: "check-deps", Run: "which php nginx mariadb wp"},
+				{Name: "create-db", Run: "mariadb -u ${db_user} -e 'CREATE DATABASE IF NOT EXISTS `${db_name}`'", OnFail: "retry"},
+				{Name: "download-wp", Run: "php -d memory_limit=512M $(which wp) core download --path=${wp_root} --version=${wp_ver}", OnFail: "retry"},
+				{Name: "gen-wp-config", Run: "php -d memory_limit=512M $(which wp) config create --path=${wp_root} --dbname=${db_name} --dbuser=${db_user} --dbhost=${db_host} --skip-check"},
+				{Name: "provision-services", Run: "brew services restart php@${php_ver} 2>/dev/null; brew services start nginx 2>/dev/null; nginx -s reload", OnFail: "retry"},
+				{Name: "install-wp", Run: "php -d memory_limit=512M $(which wp) core install --path=${wp_root} --url=localhost:${port} --title=${site} --admin_user=${admin_user} --admin_password=${admin_pass} --admin_email=${admin_email}", OnFail: "retry"},
+				{Name: "set-permalinks", Run: "php -d memory_limit=512M $(which wp) rewrite structure '/%postname%/' --path=${wp_root} && php -d memory_limit=512M $(which wp) rewrite flush --path=${wp_root}"},
+			},
 		},
 		"start": {
-			{Name: "enable-vhost", Run: "mv ${vhost}.disabled ${vhost} 2>/dev/null || true"},
-			{Name: "start-php", Run: "brew services start php@${php_ver}"},
-			{Name: "start-nginx", Run: "nginx -s reload"},
+			description: "Start WordPress site",
+			steps: []pawlStep{
+				{Name: "enable-vhost", Run: "mv ${vhost}.disabled ${vhost} 2>/dev/null || true"},
+				{Name: "start-php", Run: "brew services start php@${php_ver}"},
+				{Name: "start-nginx", Run: "nginx -s reload"},
+			},
 		},
 		"stop": {
-			{Name: "disable-vhost", Run: "mv ${vhost} ${vhost}.disabled 2>/dev/null || true"},
-			{Name: "stop-nginx", Run: "nginx -s reload"},
+			description: "Stop WordPress site",
+			steps: []pawlStep{
+				{Name: "disable-vhost", Run: "mv ${vhost} ${vhost}.disabled 2>/dev/null || true"},
+				{Name: "stop-nginx", Run: "nginx -s reload"},
+			},
 		},
 		"destroy": {
-			{Name: "drop-db", Run: "mariadb -u ${db_user} -e 'DROP DATABASE IF EXISTS ${db_name}'"},
-			{Name: "destroy-vhost", Run: "rm -f ${vhost} ${vhost}.disabled ${nginx_link}"},
-			{Name: "destroy-fpm", Run: "rm -f ${fpm_local} ${fpm_pool}"},
-			{Name: "destroy-nginx", Run: "nginx -s reload"},
+			description: "Destroy WordPress site",
+			steps: []pawlStep{
+				{Name: "drop-db", Run: "mariadb -u ${db_user} -e 'DROP DATABASE IF EXISTS `${db_name}`'"},
+				{Name: "destroy-vhost", Run: "rm -f ${vhost} ${vhost}.disabled ${nginx_link}"},
+				{Name: "destroy-fpm", Run: "rm -f ${fpm_local} ${fpm_pool}"},
+				{Name: "destroy-reload", Run: "brew services restart php@${php_ver} 2>/dev/null; nginx -s reload"},
+			},
 		},
 	}
 
-	for name, steps := range workflows {
-		cfg := pawlConfig{Vars: vars, Workflow: steps}
+	for name, wf := range workflows {
+		cfg := pawlConfig{
+			Vars: vars,
+			Tasks: map[string]pawlTaskDecl{
+				name: {Description: wf.description},
+			},
+			Workflow: wf.steps,
+		}
 		data, err := json.MarshalIndent(cfg, "", "  ")
 		if err != nil {
 			return err

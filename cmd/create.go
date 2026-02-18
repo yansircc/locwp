@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/yansircc/locwp/internal/config"
@@ -56,7 +57,7 @@ var addCmd = &cobra.Command{
 			Port:       port,
 			PHP:        flagPHP,
 			WPVer:      "latest",
-			DBName:     "wp_" + name,
+			DBName:     "wp_" + strings.ReplaceAll(name, "-", "_"),
 			DBUser:     dbUser,
 			DBHost:     "localhost",
 			SiteDir:    siteDir,
