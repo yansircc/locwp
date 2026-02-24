@@ -1,8 +1,10 @@
 package exec
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 )
 
 // CommandExists checks if a command is available in PATH.
@@ -28,6 +30,20 @@ func RunInDir(dir string, name string, args ...string) error {
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 	return cmd.Run()
+}
+
+// RunPawlWorkflow copies the named workflow to .pawl/config.json and runs it.
+func RunPawlWorkflow(siteDir, workflow string) error {
+	src := filepath.Join(siteDir, ".pawl", "workflows", workflow+".json")
+	dst := filepath.Join(siteDir, ".pawl", "config.json")
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return fmt.Errorf("read workflow %q: %w", workflow, err)
+	}
+	if err := os.WriteFile(dst, data, 0644); err != nil {
+		return fmt.Errorf("write pawl config: %w", err)
+	}
+	return RunInDir(siteDir, "pawl", "start", workflow)
 }
 
 // Output executes a command and returns its stdout as a string.

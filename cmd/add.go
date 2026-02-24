@@ -133,7 +133,7 @@ var addCmd = &cobra.Command{
 		}
 
 		// Run provision workflow
-		return exec.RunInDir(siteDir, "pawl", "start", "provision")
+		return exec.RunPawlWorkflow(siteDir, "provision")
 	},
 }
 

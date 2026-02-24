@@ -22,7 +22,7 @@ var deleteCmd = &cobra.Command{
 		}
 
 		// Run destroy workflow (drops DB, removes nginx/FPM configs, reloads nginx)
-		_ = exec.RunInDir(sc.SiteDir, "pawl", "start", "destroy")
+		_ = exec.RunPawlWorkflow(sc.SiteDir, "destroy")
 
 		// Remove site directory (pawl can't delete its own working directory)
 		os.RemoveAll(sc.SiteDir)
