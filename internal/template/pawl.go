@@ -29,6 +29,9 @@ func WritePawlWorkflows(workflowDir string, sc *site.Config) error {
 	baseDir := filepath.Dir(filepath.Dir(sc.SiteDir))
 	vhost := filepath.Join(baseDir, "nginx", "sites", sc.Name+".conf")
 
+	prefix := HomebrewPrefix()
+	phpBin := filepath.Join(prefix, "opt", "php@"+sc.PHP, "bin", "php")
+
 	vars := map[string]string{
 		"site":        sc.Name,
 		"domain":      sc.Domain,
@@ -38,12 +41,13 @@ func WritePawlWorkflows(workflowDir string, sc *site.Config) error {
 		"wp_root":     sc.WPRoot,
 		"wp_ver":      sc.WPVer,
 		"php_ver":     sc.PHP,
+		"php_bin":     phpBin,
 		"site_dir":    sc.SiteDir,
 		"admin_user":  sc.AdminUser,
 		"admin_pass":  sc.AdminPass,
 		"admin_email": sc.AdminEmail,
 		"vhost":       vhost,
-		"nginx_link":  filepath.Join(HomebrewPrefix(), "etc", "nginx", "servers", "locwp-"+sc.Name+".conf"),
+		"nginx_link":  filepath.Join(prefix, "etc", "nginx", "servers", "locwp-"+sc.Name+".conf"),
 		"fpm_local":   filepath.Join(baseDir, "php", sc.Name+".conf"),
 		"fpm_pool":    filepath.Join(FPMPoolDir(sc.PHP), "locwp-"+sc.Name+".conf"),
 	}
@@ -57,13 +61,13 @@ func WritePawlWorkflows(workflowDir string, sc *site.Config) error {
 		"provision": {
 			description: "Provision WordPress site",
 			steps: []pawlStep{
-				{Name: "check-deps", Run: "which php nginx mariadb wp"},
+				{Name: "check-deps", Run: "test -x ${php_bin} && which nginx mariadb wp"},
 				{Name: "create-db", Run: "mariadb -u ${db_user} -e 'CREATE DATABASE IF NOT EXISTS `${db_name}`'", OnFail: "retry"},
-				{Name: "download-wp", Run: "php -d memory_limit=512M $(which wp) core download --path=${wp_root} --version=${wp_ver}", OnFail: "retry"},
-				{Name: "gen-wp-config", Run: "php -d memory_limit=512M $(which wp) config create --path=${wp_root} --dbname=${db_name} --dbuser=${db_user} --dbhost=${db_host} --skip-check"},
+				{Name: "download-wp", Run: "${php_bin} -d memory_limit=512M $(which wp) core download --path=${wp_root} --version=${wp_ver}", OnFail: "retry"},
+				{Name: "gen-wp-config", Run: "${php_bin} -d memory_limit=512M $(which wp) config create --path=${wp_root} --dbname=${db_name} --dbuser=${db_user} --dbhost=${db_host} --skip-check"},
 				{Name: "provision-services", Run: "brew services restart php@${php_ver} 2>/dev/null; sudo nginx -s reload", OnFail: "retry"},
-				{Name: "install-wp", Run: "php -d memory_limit=512M $(which wp) core install --path=${wp_root} --url=https://${domain} --title=${site} --admin_user=${admin_user} --admin_password=${admin_pass} --admin_email=${admin_email}", OnFail: "retry"},
-				{Name: "set-permalinks", Run: "php -d memory_limit=512M $(which wp) rewrite structure '/%postname%/' --path=${wp_root} && php -d memory_limit=512M $(which wp) rewrite flush --path=${wp_root}"},
+				{Name: "install-wp", Run: "${php_bin} -d memory_limit=512M $(which wp) core install --path=${wp_root} --url=https://${domain} --title=${site} --admin_user=${admin_user} --admin_password=${admin_pass} --admin_email=${admin_email}", OnFail: "retry"},
+				{Name: "set-permalinks", Run: "${php_bin} -d memory_limit=512M $(which wp) rewrite structure '/%postname%/' --path=${wp_root} && ${php_bin} -d memory_limit=512M $(which wp) rewrite flush --path=${wp_root}"},
 			},
 		},
 		"start": {
