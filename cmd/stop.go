@@ -18,7 +18,7 @@ var stopCmd = &cobra.Command{
 			return err
 		}
 
-		if err := exec.RunInDir(sc.SiteDir, "pawl", "start", "stop"); err != nil {
+		if err := exec.RunPawlWorkflow(sc.SiteDir, "stop"); err != nil {
 			return err
 		}
 
