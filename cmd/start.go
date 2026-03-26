@@ -18,7 +18,7 @@ var startCmd = &cobra.Command{
 			return err
 		}
 
-		if err := exec.RunInDir(sc.SiteDir, "pawl", "start", "start"); err != nil {
+		if err := exec.RunInDir(sc.SiteDir, "pawl", "start", "--reset", "start"); err != nil {
 			return err
 		}
 
