@@ -39,15 +39,15 @@ var listCmd = &cobra.Command{
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "NAME\tDOMAIN\tPHP\tSTATUS")
+		fmt.Fprintln(w, "NAME\tURL\tPHP\tSTATUS\tPATH")
 		for _, e := range dirs {
 			sc, err := site.Load(filepath.Join(sitesDir, e.Name()))
 			if err != nil {
-				fmt.Fprintf(w, "%s\t-\t-\terror\n", e.Name())
+				fmt.Fprintf(w, "%s\t-\t-\terror\t-\n", e.Name())
 				continue
 			}
 			status := site.Status(sc)
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", sc.Name, sc.Domain, sc.PHP, status)
+			fmt.Fprintf(w, "%s\thttps://%s\t%s\t%s\t%s\n", sc.Name, sc.Domain, sc.PHP, status, sc.WPRoot)
 		}
 		return w.Flush()
 	},
