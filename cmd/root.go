@@ -7,7 +7,7 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "locwp",
 	Short: "Local WordPress site manager",
-	Long:  "Create and manage local WordPress development sites using native PHP, MariaDB, and Nginx.",
+	Long:  "Create and manage local WordPress development sites using native PHP, MariaDB, and Caddy.",
 }
 
 func Execute() error {

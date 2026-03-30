@@ -14,12 +14,9 @@ import (
 func testSiteConfig(dir string) *site.Config {
 	return &site.Config{
 		Name:       "demo",
-		Domain:     "demo.loc.wp",
+		Port:       10001,
 		PHP:        "8.2",
 		WPVer:      "6.4",
-		DBName:     "wp_demo",
-		DBUser:     "root",
-		DBHost:     "127.0.0.1",
 		SiteDir:    filepath.Join(dir, "sites", "demo"),
 		WPRoot:     filepath.Join(dir, "sites", "demo", "wordpress"),
 		AdminUser:  "admin",
@@ -68,13 +65,13 @@ func TestFPMPoolDir(t *testing.T) {
 	}
 }
 
-func TestWriteNginxConf(t *testing.T) {
+func TestWriteCaddyConf(t *testing.T) {
 	dir := t.TempDir()
 	sc := testSiteConfig(dir)
-	outPath := filepath.Join(dir, "test.conf")
+	outPath := filepath.Join(dir, "test.caddy")
 
-	if err := WriteNginxConf(outPath, sc); err != nil {
-		t.Fatalf("WriteNginxConf() error: %v", err)
+	if err := WriteCaddyConf(outPath, sc); err != nil {
+		t.Fatalf("WriteCaddyConf() error: %v", err)
 	}
 
 	data, err := os.ReadFile(outPath)
@@ -85,19 +82,15 @@ func TestWriteNginxConf(t *testing.T) {
 	content := string(data)
 
 	checks := []string{
-		"listen 443 ssl",
-		"server_name demo.loc.wp",
-		"ssl_certificate",
-		"return 301 https://",
-		"root " + sc.WPRoot,
-		"fastcgi_pass unix:/tmp/locwp-demo.sock",
-		"access_log " + sc.SiteDir + "/logs/access.log",
-		"try_files",
-		"index.php",
+		":10001",
+		"root * " + sc.WPRoot,
+		"php_fastcgi unix//tmp/locwp-demo.sock",
+		"file_server",
+		sc.SiteDir + "/logs/access.log",
 	}
 	for _, check := range checks {
 		if !strings.Contains(content, check) {
-			t.Errorf("nginx conf missing %q", check)
+			t.Errorf("caddy conf missing %q", check)
 		}
 	}
 }
@@ -163,8 +156,8 @@ func TestWritePawlWorkflows(t *testing.T) {
 		if vars["site"] != "demo" {
 			t.Errorf("%s vars.site = %q, want \"demo\"", f, vars["site"])
 		}
-		if vars["domain"] != "demo.loc.wp" {
-			t.Errorf("%s vars.domain = %q, want \"demo.loc.wp\"", f, vars["domain"])
+		if vars["port"] != "10001" {
+			t.Errorf("%s vars.port = %q, want \"10001\"", f, vars["port"])
 		}
 
 		tasks, ok := raw["tasks"].(map[string]interface{})
@@ -182,24 +175,37 @@ func TestWritePawlWorkflows(t *testing.T) {
 		}
 	}
 
-	// Spot-check provision workflow has install-wp and set-permalinks steps
+	// Spot-check provision workflow has SQLite-related steps
 	data, _ := os.ReadFile(filepath.Join(workflowDir, "provision.json"))
-	if !strings.Contains(string(data), "install-wp") {
+	content := string(data)
+	if !strings.Contains(content, "pdo_sqlite") {
+		t.Error("provision.json missing pdo_sqlite check")
+	}
+	if !strings.Contains(content, "sqlite-database-integration") {
+		t.Error("provision.json missing sqlite plugin download")
+	}
+	if !strings.Contains(content, "db.copy") {
+		t.Error("provision.json missing db.php drop-in setup")
+	}
+	if !strings.Contains(content, "install-wp") {
 		t.Error("provision.json missing install-wp step")
 	}
-	if !strings.Contains(string(data), "set-permalinks") {
+	if !strings.Contains(content, "set-permalinks") {
 		t.Error("provision.json missing set-permalinks step")
 	}
 
-	// Spot-check destroy workflow has drop-db step
+	// Spot-check destroy workflow has NO mariadb references
 	data, _ = os.ReadFile(filepath.Join(workflowDir, "destroy.json"))
-	if !strings.Contains(string(data), "drop-db") {
-		t.Error("destroy.json missing drop-db step")
+	if strings.Contains(string(data), "mariadb") {
+		t.Error("destroy.json should not reference mariadb")
 	}
 
-	// Check path vars are populated
+	// Check that start.json references caddy (not nginx)
 	data, _ = os.ReadFile(filepath.Join(workflowDir, "start.json"))
-	if !strings.Contains(string(data), "nginx") {
-		t.Error("start.json missing nginx-related path in vars")
+	if !strings.Contains(string(data), "caddy") {
+		t.Error("start.json missing caddy reference")
+	}
+	if strings.Contains(string(data), "nginx") {
+		t.Error("start.json should not reference nginx")
 	}
 }

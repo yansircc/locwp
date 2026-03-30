@@ -3,10 +3,8 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"os/user"
 	"path/filepath"
 	"regexp"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/yansircc/locwp/internal/config"
@@ -44,26 +42,14 @@ var addCmd = &cobra.Command{
 			return fmt.Errorf("site %q already exists", name)
 		}
 
-		// Generate domain and check for duplicates
-		domain := name + ".loc.wp"
-		if config.DomainExists(baseDir, domain) {
-			return fmt.Errorf("domain %q is already in use", domain)
-		}
-
-		// DB user: current system user (Homebrew MariaDB default)
-		dbUser := "root"
-		if u, err := user.Current(); err == nil {
-			dbUser = u.Username
-		}
+		// Allocate next available port
+		port := config.NextPort(baseDir)
 
 		sc := &site.Config{
 			Name:       name,
-			Domain:     domain,
+			Port:       port,
 			PHP:        flagPHP,
 			WPVer:      "latest",
-			DBName:     "wp_" + strings.ReplaceAll(name, "-", "_"),
-			DBUser:     dbUser,
-			DBHost:     "localhost",
 			SiteDir:    siteDir,
 			WPRoot:     filepath.Join(siteDir, "wordpress"),
 			AdminUser:  flagAdminUser,
@@ -83,22 +69,15 @@ var addCmd = &cobra.Command{
 			return err
 		}
 
-		// Generate nginx vhost
-		nginxDir := filepath.Join(baseDir, "nginx", "sites")
-		if err := os.MkdirAll(nginxDir, 0755); err != nil {
+		// Generate Caddy site config
+		caddySitesDir := config.CaddySitesDir()
+		if err := os.MkdirAll(caddySitesDir, 0755); err != nil {
 			return err
 		}
-		vhostPath := filepath.Join(nginxDir, name+".conf")
-		if err := template.WriteNginxConf(vhostPath, sc); err != nil {
+		caddyConfPath := filepath.Join(caddySitesDir, name+".caddy")
+		if err := template.WriteCaddyConf(caddyConfPath, sc); err != nil {
 			return err
 		}
-
-		// Symlink vhost into Homebrew nginx servers dir
-		nginxServersDir := filepath.Join(template.HomebrewPrefix(), "etc", "nginx", "servers")
-		os.MkdirAll(nginxServersDir, 0755)
-		linkPath := filepath.Join(nginxServersDir, "locwp-"+name+".conf")
-		os.Remove(linkPath)
-		os.Symlink(vhostPath, linkPath)
 
 		// Generate PHP-FPM pool (local copy)
 		phpDir := filepath.Join(baseDir, "php")
@@ -126,7 +105,7 @@ var addCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Site %q configured (https://%s, PHP %s)\n", name, domain, flagPHP)
+		fmt.Printf("Site %q configured (%s, PHP %s)\n", name, sc.URL(), flagPHP)
 
 		if flagNoStart {
 			return nil

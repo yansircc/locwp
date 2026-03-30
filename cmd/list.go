@@ -47,7 +47,7 @@ var listCmd = &cobra.Command{
 				continue
 			}
 			status := site.Status(sc)
-			fmt.Fprintf(w, "%s\thttps://%s\t%s\t%s\t%s\n", sc.Name, sc.Domain, sc.PHP, status, sc.WPRoot)
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", sc.Name, sc.URL(), sc.PHP, status, sc.WPRoot)
 		}
 		return w.Flush()
 	},

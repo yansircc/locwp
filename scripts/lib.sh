@@ -50,7 +50,7 @@ assert_http_status() {
   local url="$1" expected="$2" label="$3"
   local status
   for attempt in 1 2 3 4 5; do
-    status=$(curl -sk --noproxy '*' -o /dev/null -w '%{http_code}' --connect-timeout 3 --max-time 5 "$url" 2>/dev/null) || true
+    status=$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' --connect-timeout 3 --max-time 5 "$url" 2>/dev/null) || true
     [[ "$status" == "$expected" ]] && break
     sleep 1
   done
@@ -59,6 +59,21 @@ assert_http_status() {
   else
     fail "$label (got HTTP $status, want $expected)"
   fi
+}
+
+# ─── Helpers ─────────────────────────────────────────────
+# Read port from a site's config.json
+site_port() {
+  local name="$1"
+  python3 -c "import json; print(json.load(open('$LOCWP_HOME/sites/$name/config.json'))['port'])" 2>/dev/null
+}
+
+# Build the site URL from name
+site_url() {
+  local name="$1"
+  local port
+  port=$(site_port "$name")
+  echo "http://localhost:$port"
 }
 
 # ─── Command execution ───────────────────────────────────
@@ -79,27 +94,9 @@ run_capture() {
 # ─── Lifecycle ───────────────────────────────────────────
 cleanup() {
   rm -f "$TMPOUT"
-  sudo rm -f /etc/sudoers.d/locwp-test 2>/dev/null || true
   exit
 }
 trap cleanup EXIT INT TERM
-
-# Initialize sudo
-init_sudo() {
-  echo 'a23456' | sudo -S -v 2>/dev/null
-  if [[ $? -ne 0 ]]; then
-    echo -e "${RED}sudo password incorrect, exiting${NC}"
-    exit 1
-  fi
-  echo "$(whoami) ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/locwp-test >/dev/null
-  sudo chmod 0440 /etc/sudoers.d/locwp-test
-}
-
-# Restore sudo (reset.sh removes locwp-test)
-restore_sudo() {
-  echo "$(whoami) ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/locwp-test >/dev/null
-  sudo chmod 0440 /etc/sudoers.d/locwp-test
-}
 
 # Build binary
 build_binary() {

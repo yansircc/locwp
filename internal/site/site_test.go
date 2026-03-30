@@ -8,12 +8,9 @@ import (
 func newTestConfig(dir string) *Config {
 	return &Config{
 		Name:    "testsite",
-		Domain:  "testsite.loc.wp",
+		Port:    10001,
 		PHP:     "8.3",
 		WPVer:   "latest",
-		DBName:  "wp_testsite",
-		DBUser:  "root",
-		DBHost:  "127.0.0.1",
 		SiteDir: dir,
 		WPRoot:  filepath.Join(dir, "wordpress"),
 	}
@@ -35,14 +32,11 @@ func TestSaveAndLoad(t *testing.T) {
 	if loaded.Name != sc.Name {
 		t.Errorf("Name = %q, want %q", loaded.Name, sc.Name)
 	}
-	if loaded.Domain != sc.Domain {
-		t.Errorf("Domain = %q, want %q", loaded.Domain, sc.Domain)
+	if loaded.Port != sc.Port {
+		t.Errorf("Port = %d, want %d", loaded.Port, sc.Port)
 	}
 	if loaded.PHP != sc.PHP {
 		t.Errorf("PHP = %q, want %q", loaded.PHP, sc.PHP)
-	}
-	if loaded.DBName != sc.DBName {
-		t.Errorf("DBName = %q, want %q", loaded.DBName, sc.DBName)
 	}
 	if loaded.WPRoot != sc.WPRoot {
 		t.Errorf("WPRoot = %q, want %q", loaded.WPRoot, sc.WPRoot)
@@ -56,13 +50,21 @@ func TestLoad_NotExist(t *testing.T) {
 	}
 }
 
-func TestStatus_NoVhost(t *testing.T) {
+func TestStatus_NoCaddyConf(t *testing.T) {
 	baseDir := t.TempDir()
 	t.Setenv("LOCWP_HOME", baseDir)
 
 	sc := newTestConfig(baseDir)
 	status := Status(sc)
 	if status != "stopped" {
-		t.Errorf("Status() = %q, want \"stopped\" when no vhost exists", status)
+		t.Errorf("Status() = %q, want \"stopped\" when no caddy conf exists", status)
+	}
+}
+
+func TestURL(t *testing.T) {
+	sc := &Config{Port: 10005}
+	want := "http://localhost:10005"
+	if got := sc.URL(); got != want {
+		t.Errorf("URL() = %q, want %q", got, want)
 	}
 }

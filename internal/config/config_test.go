@@ -26,33 +26,55 @@ func TestBaseDir_EnvOverride(t *testing.T) {
 	}
 }
 
-func TestDomainExists_NoSites(t *testing.T) {
+func TestNextPort_NoSites(t *testing.T) {
 	tmp := t.TempDir()
-	if DomainExists(tmp, "foo.loc.wp") {
-		t.Error("DomainExists should return false when no sites dir exists")
+	port := NextPort(tmp)
+	if port != StartPort {
+		t.Errorf("NextPort() = %d, want %d", port, StartPort)
 	}
 }
 
-func TestDomainExists_Match(t *testing.T) {
+func TestNextPort_WithExisting(t *testing.T) {
 	tmp := t.TempDir()
 	siteDir := filepath.Join(tmp, "sites", "mysite")
 	os.MkdirAll(siteDir, 0755)
-	data, _ := json.Marshal(map[string]string{"domain": "mysite.loc.wp"})
+	data, _ := json.Marshal(map[string]interface{}{"port": 10003})
 	os.WriteFile(filepath.Join(siteDir, "config.json"), data, 0644)
 
-	if !DomainExists(tmp, "mysite.loc.wp") {
-		t.Error("DomainExists should return true for existing domain")
+	port := NextPort(tmp)
+	if port != 10004 {
+		t.Errorf("NextPort() = %d, want 10004", port)
 	}
 }
 
-func TestDomainExists_NoMatch(t *testing.T) {
+func TestNextPort_MultipleSites(t *testing.T) {
 	tmp := t.TempDir()
-	siteDir := filepath.Join(tmp, "sites", "mysite")
-	os.MkdirAll(siteDir, 0755)
-	data, _ := json.Marshal(map[string]string{"domain": "mysite.loc.wp"})
-	os.WriteFile(filepath.Join(siteDir, "config.json"), data, 0644)
+	for _, s := range []struct {
+		name string
+		port int
+	}{
+		{"site1", 10001},
+		{"site2", 10005},
+		{"site3", 10003},
+	} {
+		dir := filepath.Join(tmp, "sites", s.name)
+		os.MkdirAll(dir, 0755)
+		data, _ := json.Marshal(map[string]interface{}{"port": s.port})
+		os.WriteFile(filepath.Join(dir, "config.json"), data, 0644)
+	}
 
-	if DomainExists(tmp, "other.loc.wp") {
-		t.Error("DomainExists should return false for non-matching domain")
+	port := NextPort(tmp)
+	if port != 10006 {
+		t.Errorf("NextPort() = %d, want 10006", port)
+	}
+}
+
+func TestCaddySitesDir(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("LOCWP_HOME", tmp)
+	dir := CaddySitesDir()
+	want := filepath.Join(tmp, "caddy", "sites")
+	if dir != want {
+		t.Errorf("CaddySitesDir() = %q, want %q", dir, want)
 	}
 }

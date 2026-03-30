@@ -11,6 +11,9 @@ const dirName = ".locwp"
 // DefaultPHP is the default PHP version used across setup and add commands.
 const DefaultPHP = "8.3"
 
+// StartPort is the first port allocated to sites.
+const StartPort = 10001
+
 // BaseDir returns the locwp data directory, creating it if needed.
 // Honors LOCWP_HOME env var, defaults to ~/.locwp.
 func BaseDir() string {
@@ -23,18 +26,19 @@ func BaseDir() string {
 	return dir
 }
 
-// SSLDir returns the path to the SSL certificate directory (~/.locwp/ssl/).
-func SSLDir() string {
-	return filepath.Join(BaseDir(), "ssl")
+// CaddySitesDir returns the path to per-site Caddy config directory.
+func CaddySitesDir() string {
+	return filepath.Join(BaseDir(), "caddy", "sites")
 }
 
-// DomainExists checks whether any existing site already uses the given domain.
-func DomainExists(baseDir, domain string) bool {
+// NextPort scans all site configs and returns the next available port.
+func NextPort(baseDir string) int {
 	sitesDir := filepath.Join(baseDir, "sites")
 	entries, err := os.ReadDir(sitesDir)
 	if err != nil {
-		return false
+		return StartPort
 	}
+	maxPort := StartPort - 1
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
@@ -44,11 +48,11 @@ func DomainExists(baseDir, domain string) bool {
 			continue
 		}
 		var cfg struct {
-			Domain string `json:"domain"`
+			Port int `json:"port"`
 		}
-		if json.Unmarshal(data, &cfg) == nil && cfg.Domain == domain {
-			return true
+		if json.Unmarshal(data, &cfg) == nil && cfg.Port > maxPort {
+			maxPort = cfg.Port
 		}
 	}
-	return false
+	return maxPort + 1
 }

@@ -2,16 +2,18 @@ package template
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/yansircc/locwp/internal/config"
 	"github.com/yansircc/locwp/internal/site"
 )
 
 type pawlConfig struct {
-	Vars     map[string]string          `json:"vars"`
-	Tasks    map[string]pawlTaskDecl    `json:"tasks"`
-	Workflow []pawlStep                 `json:"workflow"`
+	Vars     map[string]string       `json:"vars"`
+	Tasks    map[string]pawlTaskDecl `json:"tasks"`
+	Workflow []pawlStep              `json:"workflow"`
 }
 
 type pawlTaskDecl struct {
@@ -24,28 +26,29 @@ type pawlStep struct {
 	OnFail string `json:"on_fail,omitempty"`
 }
 
+const sqlitePluginURL = "https://downloads.wordpress.org/plugin/sqlite-database-integration.latest-stable.zip"
+
 // WritePawlWorkflows generates all lifecycle workflow files under workflowDir.
 func WritePawlWorkflows(workflowDir string, sc *site.Config) error {
+	prefix := HomebrewPrefix()
+	phpBin := filepath.Join(prefix, "opt", "php@"+sc.PHP, "bin", "php")
 	baseDir := filepath.Dir(filepath.Dir(sc.SiteDir))
-	vhost := filepath.Join(baseDir, "nginx", "sites", sc.Name+".conf")
 
 	vars := map[string]string{
-		"site":        sc.Name,
-		"domain":      sc.Domain,
-		"db_name":     sc.DBName,
-		"db_user":     sc.DBUser,
-		"db_host":     sc.DBHost,
-		"wp_root":     sc.WPRoot,
-		"wp_ver":      sc.WPVer,
-		"php_ver":     sc.PHP,
-		"site_dir":    sc.SiteDir,
-		"admin_user":  sc.AdminUser,
-		"admin_pass":  sc.AdminPass,
-		"admin_email": sc.AdminEmail,
-		"vhost":       vhost,
-		"nginx_link":  filepath.Join(HomebrewPrefix(), "etc", "nginx", "servers", "locwp-"+sc.Name+".conf"),
-		"fpm_local":   filepath.Join(baseDir, "php", sc.Name+".conf"),
-		"fpm_pool":    filepath.Join(FPMPoolDir(sc.PHP), "locwp-"+sc.Name+".conf"),
+		"site":             sc.Name,
+		"port":             fmt.Sprintf("%d", sc.Port),
+		"wp_root":          sc.WPRoot,
+		"wp_ver":           sc.WPVer,
+		"php_ver":          sc.PHP,
+		"php_bin":          phpBin,
+		"site_dir":         sc.SiteDir,
+		"admin_user":       sc.AdminUser,
+		"admin_pass":       sc.AdminPass,
+		"admin_email":      sc.AdminEmail,
+		"caddy_conf":       filepath.Join(config.CaddySitesDir(), sc.Name+".caddy"),
+		"fpm_local":        filepath.Join(baseDir, "php", sc.Name+".conf"),
+		"fpm_pool":         filepath.Join(FPMPoolDir(sc.PHP), "locwp-"+sc.Name+".conf"),
+		"sqlite_plugin_url": sqlitePluginURL,
 	}
 
 	type workflowDef struct {
@@ -57,37 +60,38 @@ func WritePawlWorkflows(workflowDir string, sc *site.Config) error {
 		"provision": {
 			description: "Provision WordPress site",
 			steps: []pawlStep{
-				{Name: "check-deps", Run: "which php nginx mariadb wp"},
-				{Name: "create-db", Run: "mariadb -u ${db_user} -e 'CREATE DATABASE IF NOT EXISTS `${db_name}`'", OnFail: "retry"},
-				{Name: "download-wp", Run: "php -d memory_limit=512M $(which wp) core download --path=${wp_root} --version=${wp_ver}", OnFail: "retry"},
-				{Name: "gen-wp-config", Run: "php -d memory_limit=512M $(which wp) config create --path=${wp_root} --dbname=${db_name} --dbuser=${db_user} --dbhost=${db_host} --skip-check"},
-				{Name: "provision-services", Run: "brew services restart php@${php_ver} 2>/dev/null; sudo nginx -s reload", OnFail: "retry"},
-				{Name: "install-wp", Run: "php -d memory_limit=512M $(which wp) core install --path=${wp_root} --url=https://${domain} --title=${site} --admin_user=${admin_user} --admin_password=${admin_pass} --admin_email=${admin_email}", OnFail: "retry"},
-				{Name: "set-permalinks", Run: "php -d memory_limit=512M $(which wp) rewrite structure '/%postname%/' --path=${wp_root} && php -d memory_limit=512M $(which wp) rewrite flush --path=${wp_root}"},
+				{Name: "check-deps", Run: "test -x ${php_bin} && which caddy wp && ${php_bin} -m | grep -q pdo_sqlite"},
+				{Name: "download-wp", Run: "${php_bin} -d memory_limit=512M $(which wp) core download --path=${wp_root} --version=${wp_ver}", OnFail: "retry"},
+				{Name: "download-sqlite-plugin", Run: "curl -sL ${sqlite_plugin_url} -o /tmp/locwp-sqlite-plugin.zip && unzip -qo /tmp/locwp-sqlite-plugin.zip -d ${wp_root}/wp-content/plugins/ && rm -f /tmp/locwp-sqlite-plugin.zip", OnFail: "retry"},
+				{Name: "setup-db-dropin", Run: "cp ${wp_root}/wp-content/plugins/sqlite-database-integration/db.copy ${wp_root}/wp-content/db.php && mkdir -p ${wp_root}/wp-content/database"},
+				{Name: "gen-wp-config", Run: "${php_bin} -d memory_limit=512M $(which wp) config create --path=${wp_root} --dbname=wordpress --dbuser=unused --dbhost=unused --skip-check"},
+				{Name: "configure-sqlite", Run: "${php_bin} -d memory_limit=512M $(which wp) config set DB_DIR ${wp_root}/wp-content/database --path=${wp_root} --type=constant && ${php_bin} -d memory_limit=512M $(which wp) config set DB_FILE .ht.sqlite --path=${wp_root} --type=constant"},
+				{Name: "provision-services", Run: "brew services restart php@${php_ver} 2>/dev/null; brew services restart caddy", OnFail: "retry"},
+				{Name: "install-wp", Run: "${php_bin} -d memory_limit=512M $(which wp) core install --path=${wp_root} --url=http://localhost:${port} --title=${site} --admin_user=${admin_user} --admin_password=${admin_pass} --admin_email=${admin_email}", OnFail: "retry"},
+				{Name: "set-permalinks", Run: "${php_bin} -d memory_limit=512M $(which wp) rewrite structure '/%postname%/' --path=${wp_root} && ${php_bin} -d memory_limit=512M $(which wp) rewrite flush --path=${wp_root}"},
 			},
 		},
 		"start": {
 			description: "Start WordPress site",
 			steps: []pawlStep{
-				{Name: "enable-vhost", Run: "mv ${vhost}.disabled ${vhost} 2>/dev/null || true; ln -sf ${vhost} ${nginx_link}"},
+				{Name: "enable-caddy-conf", Run: "mv ${caddy_conf}.disabled ${caddy_conf} 2>/dev/null || true"},
 				{Name: "start-php", Run: "brew services start php@${php_ver}"},
-				{Name: "start-nginx", Run: "sudo nginx -s reload"},
+				{Name: "reload-caddy", Run: "brew services restart caddy"},
 			},
 		},
 		"stop": {
 			description: "Stop WordPress site",
 			steps: []pawlStep{
-				{Name: "disable-vhost", Run: "mv ${vhost} ${vhost}.disabled 2>/dev/null || true; rm -f ${nginx_link}"},
-				{Name: "stop-nginx", Run: "sudo nginx -s reload || true"},
+				{Name: "disable-caddy-conf", Run: "mv ${caddy_conf} ${caddy_conf}.disabled 2>/dev/null || true"},
+				{Name: "reload-caddy", Run: "brew services restart caddy || true"},
 			},
 		},
 		"destroy": {
 			description: "Destroy WordPress site",
 			steps: []pawlStep{
-				{Name: "drop-db", Run: "mariadb -u ${db_user} -e 'DROP DATABASE IF EXISTS `${db_name}`'"},
-				{Name: "destroy-vhost", Run: "rm -f ${vhost} ${vhost}.disabled ${nginx_link}"},
+				{Name: "destroy-caddy-conf", Run: "rm -f ${caddy_conf} ${caddy_conf}.disabled"},
 				{Name: "destroy-fpm", Run: "rm -f ${fpm_local} ${fpm_pool}"},
-				{Name: "destroy-reload", Run: "brew services restart php@${php_ver} 2>/dev/null; sudo nginx -s reload || true"},
+				{Name: "destroy-reload", Run: "brew services restart php@${php_ver} 2>/dev/null; brew services restart caddy || true"},
 			},
 		},
 	}

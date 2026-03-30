@@ -22,7 +22,7 @@ var startCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Site %q started at https://%s (PHP %s)\n", sc.Name, sc.Domain, sc.PHP)
+		fmt.Printf("Site %q started at %s (PHP %s)\n", sc.Name, sc.URL(), sc.PHP)
 		return nil
 	},
 }

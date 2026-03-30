@@ -4,10 +4,6 @@
 source "$(dirname "$0")/lib.sh"
 
 # ─── Initialization ──────────────────────────────────────
-echo -e "${YELLOW}=== Setting up sudo ===${NC}"
-init_sudo
-echo "  [ok] sudo NOPASSWD configured"
-
 echo ""
 echo -e "${YELLOW}=== Building latest binary ===${NC}"
 build_binary || { echo -e "${RED}Build failed${NC}"; exit 1; }
@@ -16,7 +12,6 @@ echo "  [ok] Built $BINARY"
 echo ""
 echo -e "${YELLOW}=== Running Reset ===${NC}"
 bash "$SCRIPT_DIR/reset.sh"
-restore_sudo
 
 # ─── Test 1: locwp setup ────────────────────────────────
 echo ""
@@ -27,30 +22,13 @@ setup_out=$(cat "$TMPOUT")
 assert_exit_code "$setup_rc" 0 "setup exits with code 0"
 assert_contains "$setup_out" "Setup complete" "setup outputs Setup complete"
 
-assert_dir_exists "$LOCWP_HOME/ssl" "SSL directory exists"
-assert_file_exists "$LOCWP_HOME/ssl/_wildcard.loc.wp.pem" "wildcard certificate exists"
-assert_file_exists "$LOCWP_HOME/ssl/_wildcard.loc.wp-key.pem" "wildcard certificate key exists"
-assert_file_exists "/etc/resolver/wp" "DNS resolver config exists"
-assert_file_exists "/etc/sudoers.d/locwp" "sudoers config exists"
+assert_dir_exists "$LOCWP_HOME/caddy/sites" "Caddy sites directory exists"
+assert_file_exists "$BREW_PREFIX/etc/Caddyfile" "Caddyfile exists"
 
-if grep -q 'address=/.loc.wp/127.0.0.1' "$BREW_PREFIX/etc/dnsmasq.conf"; then
-  pass "dnsmasq config contains .loc.wp"
+if grep -q 'auto_https off' "$BREW_PREFIX/etc/Caddyfile"; then
+  pass "Caddyfile disables auto_https"
 else
-  fail "dnsmasq config missing .loc.wp"
-fi
-
-sleep 2
-dns_result=$(dig +short testdns.loc.wp @127.0.0.1 2>/dev/null) || true
-if [[ "$dns_result" == *"127.0.0.1"* ]]; then
-  pass "DNS resolves .loc.wp -> 127.0.0.1"
-else
-  fail "DNS resolution failed (got '$dns_result')"
-fi
-
-if sudo nginx -t 2>/dev/null; then
-  pass "nginx config syntax valid"
-else
-  fail "nginx config syntax invalid"
+  fail "Caddyfile missing auto_https off"
 fi
 
 # ─── Test 2: locwp add testsite ─────────────────────────
@@ -64,29 +42,18 @@ assert_contains "$add_out" "configured" "add outputs configured"
 
 assert_file_exists "$LOCWP_HOME/sites/testsite/config.json" "config.json exists"
 assert_dir_exists "$LOCWP_HOME/sites/testsite/wordpress" "wordpress directory exists"
-assert_file_exists "$LOCWP_HOME/nginx/sites/testsite.conf" "nginx vhost exists"
+assert_file_exists "$LOCWP_HOME/caddy/sites/testsite.caddy" "Caddy site config exists"
 assert_file_exists "$LOCWP_HOME/php/testsite.conf" "FPM pool config exists"
 
-nginx_link="$BREW_PREFIX/etc/nginx/servers/locwp-testsite.conf"
-if [[ -L "$nginx_link" ]]; then
-  pass "nginx symlink exists"
-else
-  fail "nginx symlink missing ($nginx_link)"
-fi
-
 cfg_name=$(python3 -c "import json; print(json.load(open('$LOCWP_HOME/sites/testsite/config.json'))['name'])")
-cfg_domain=$(python3 -c "import json; print(json.load(open('$LOCWP_HOME/sites/testsite/config.json'))['domain'])")
-cfg_db=$(python3 -c "import json; print(json.load(open('$LOCWP_HOME/sites/testsite/config.json'))['db_name'])")
+cfg_port=$(site_port testsite)
 assert_eq "$cfg_name" "testsite" "config name = testsite"
-assert_eq "$cfg_domain" "testsite.loc.wp" "config domain = testsite.loc.wp"
-assert_eq "$cfg_db" "wp_testsite" "config db_name = wp_testsite"
+assert_eq "$cfg_port" "10001" "config port = 10001"
 
-db_exists=$(mariadb -e "SHOW DATABASES LIKE 'wp_testsite'" -sN 2>/dev/null) || true
-if [[ "$db_exists" == "wp_testsite" ]]; then
-  pass "database wp_testsite exists"
-else
-  fail "database wp_testsite missing (got '$db_exists')"
-fi
+# Verify SQLite database was created
+assert_file_exists "$LOCWP_HOME/sites/testsite/wordpress/wp-content/db.php" "SQLite db.php drop-in exists"
+assert_dir_exists "$LOCWP_HOME/sites/testsite/wordpress/wp-content/database" "SQLite database directory exists"
+assert_file_exists "$LOCWP_HOME/sites/testsite/wordpress/wp-content/database/.ht.sqlite" "SQLite database file exists"
 
 assert_file_exists "$LOCWP_HOME/sites/testsite/wordpress/wp-config.php" "wp-config.php exists"
 assert_file_exists "$LOCWP_HOME/sites/testsite/wordpress/index.php" "WordPress index.php exists"
@@ -94,7 +61,7 @@ assert_file_exists "$LOCWP_HOME/sites/testsite/wordpress/index.php" "WordPress i
 echo ""
 echo "  Waiting for services..."
 sleep 3
-assert_http_status "https://testsite.loc.wp" "200" "HTTPS access testsite.loc.wp"
+assert_http_status "$(site_url testsite)" "200" "HTTP access testsite"
 
 # ─── Test 3: duplicate site name ────────────────────────
 echo ""
@@ -130,14 +97,15 @@ assert_exit_code "$add3_rc" 0 "add shop exits with code 0"
 assert_file_exists "$LOCWP_HOME/sites/blog/config.json" "blog config.json exists"
 assert_file_exists "$LOCWP_HOME/sites/shop/config.json" "shop config.json exists"
 
-db2_exists=$(mariadb -e "SHOW DATABASES LIKE 'wp_blog'" -sN 2>/dev/null) || true
-db3_exists=$(mariadb -e "SHOW DATABASES LIKE 'wp_shop'" -sN 2>/dev/null) || true
-assert_eq "$db2_exists" "wp_blog" "database wp_blog exists"
-assert_eq "$db3_exists" "wp_shop" "database wp_shop exists"
+# Verify ports are sequential
+blog_port=$(site_port blog)
+shop_port=$(site_port shop)
+assert_eq "$blog_port" "10002" "blog port = 10002"
+assert_eq "$shop_port" "10003" "shop port = 10003"
 
 sleep 2
-assert_http_status "https://blog.loc.wp" "200" "HTTPS access blog.loc.wp"
-assert_http_status "https://shop.loc.wp" "200" "HTTPS access shop.loc.wp"
+assert_http_status "$(site_url blog)" "200" "HTTP access blog"
+assert_http_status "$(site_url shop)" "200" "HTTP access shop"
 
 # ─── Test 6: locwp list ────────────────────────────────
 echo ""
@@ -154,28 +122,22 @@ echo -e "${YELLOW}=== Test 7: stop and start ===${NC}"
 
 "$BINARY" stop testsite 2>&1 || true
 sleep 1
-if [[ ! -f "$LOCWP_HOME/nginx/sites/testsite.conf" ]] && [[ -f "$LOCWP_HOME/nginx/sites/testsite.conf.disabled" ]]; then
-  pass "vhost disabled after stop"
+if [[ ! -f "$LOCWP_HOME/caddy/sites/testsite.caddy" ]] && [[ -f "$LOCWP_HOME/caddy/sites/testsite.caddy.disabled" ]]; then
+  pass "caddy conf disabled after stop"
 else
-  fail "vhost state unexpected after stop"
-fi
-
-if [[ ! -L "$BREW_PREFIX/etc/nginx/servers/locwp-testsite.conf" ]]; then
-  pass "nginx symlink removed after stop"
-else
-  fail "nginx symlink should be removed after stop"
+  fail "caddy conf state unexpected after stop"
 fi
 
 "$BINARY" start testsite 2>&1 || true
 sleep 2
 
-if [[ -L "$BREW_PREFIX/etc/nginx/servers/locwp-testsite.conf" ]]; then
-  pass "nginx symlink restored after start"
+if [[ -f "$LOCWP_HOME/caddy/sites/testsite.caddy" ]]; then
+  pass "caddy conf restored after start"
 else
-  fail "nginx symlink should be restored after start"
+  fail "caddy conf should be restored after start"
 fi
 
-assert_http_status "https://testsite.loc.wp" "200" "HTTPS accessible after restart"
+assert_http_status "$(site_url testsite)" "200" "HTTP accessible after restart"
 
 # ─── Test 8: delete ─────────────────────────────────────
 echo ""
@@ -185,16 +147,9 @@ echo -e "${YELLOW}=== Test 8: delete ===${NC}"
 sleep 1
 
 if [[ ! -d "$LOCWP_HOME/sites/shop" ]]; then
-  pass "shop directory deleted"
+  pass "shop directory deleted (including SQLite DB)"
 else
   fail "shop directory should be deleted"
-fi
-
-db_shop_after=$(mariadb -e "SHOW DATABASES LIKE 'wp_shop'" -sN 2>/dev/null) || true
-if [[ -z "$db_shop_after" ]]; then
-  pass "shop database deleted"
-else
-  fail "shop database should be deleted"
 fi
 
 assert_file_exists "$LOCWP_HOME/sites/testsite/config.json" "testsite unaffected"
@@ -205,11 +160,8 @@ echo ""
 echo -e "${YELLOW}=== Test 9: site name with hyphens ===${NC}"
 add_hyphen_rc=0; run_capture "$BINARY" add my-site --pass a23456 || add_hyphen_rc=$?
 assert_exit_code "$add_hyphen_rc" 0 "add my-site exits with code 0"
-
-cfg_db_hyphen=$(python3 -c "import json; print(json.load(open('$LOCWP_HOME/sites/my-site/config.json'))['db_name'])")
-assert_eq "$cfg_db_hyphen" "wp_my_site" "hyphenated site name db_name correctly converted"
 sleep 2
-assert_http_status "https://my-site.loc.wp" "200" "HTTPS access my-site.loc.wp"
+assert_http_status "$(site_url my-site)" "200" "HTTP access my-site"
 
 # ─── Summary ────────────────────────────────────────────
 print_summary

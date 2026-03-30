@@ -1,21 +1,21 @@
 # LOCWP
 
-Local WordPress site manager for macOS. Create and manage WordPress development sites with HTTPS, custom domains, and zero configuration — all powered by native Homebrew services.
+Local WordPress site manager for macOS. Create and manage WordPress development sites on localhost with per-site ports — zero sudo, zero configuration, powered by native Homebrew services.
 
 ```bash
-locwp setup              # one-time: install PHP, MariaDB, Nginx, dnsmasq, mkcert
-locwp add mysite         # creates https://mysite.loc.wp with WordPress ready to go
+locwp setup              # one-time: install PHP, Caddy, WP-CLI
+locwp add mysite         # creates http://localhost:10001 with WordPress ready to go
 ```
 
 Built on [pawl](https://github.com/yansircc/pawl) — all site lifecycle operations are declarative JSON workflows with built-in retry, progress display, and error handling.
 
 ## Features
 
+- **Zero sudo** — no root required, everything runs as your user
 - **One-command setup** — `locwp setup` installs and configures everything
-- **HTTPS by default** — wildcard SSL via mkcert (`*.loc.wp`), no browser warnings
-- **Custom domains** — each site gets `<name>.loc.wp`, resolved via local dnsmasq
+- **Per-site ports** — each site gets its own `http://localhost:<port>` (starting from 10001)
 - **Per-site PHP** — choose PHP 8.1, 8.2, or 8.3 per site
-- **Isolated services** — dedicated Nginx vhost + PHP-FPM pool per site
+- **SQLite database** — no daemon, no service, DB is just a file inside the site directory
 - **Full lifecycle** — add, start, stop, delete with clean teardown
 - **WP-CLI passthrough** — run any wp command against any site
 - **Editable workflows** — pawl JSON workflows are plain files you can customize
@@ -43,32 +43,23 @@ go build -o locwp .
 ## Quick Start
 
 ```bash
-# 1. One-time setup (installs PHP, MariaDB, Nginx, dnsmasq, mkcert, configures SSL + DNS)
+# 1. One-time setup (installs PHP, Caddy, WP-CLI)
 locwp setup
 
 # 2. Create your first site
 locwp add mysite --pass secret123
 
 # 3. Done! Open in browser
-open https://mysite.loc.wp
+open http://localhost:10001
 ```
 
-WordPress admin login: `https://mysite.loc.wp/wp-admin/` (default user: `admin`)
+WordPress admin login: `http://localhost:10001/wp-admin/` (default user: `admin`)
 
 ### What `setup` does
 
-- Installs Homebrew packages: PHP, MariaDB, Nginx, WP-CLI, dnsmasq, mkcert
-- Generates a `*.loc.wp` wildcard SSL certificate (trusted by your browser)
-- Configures dnsmasq so all `*.loc.wp` domains resolve to `127.0.0.1`
-- Sets up macOS DNS resolver (`/etc/resolver/wp`)
-- Configures passwordless `sudo nginx -s reload` so adding sites never prompts for password
-- Starts Nginx (ports 80/443) and dnsmasq (port 53) as root services
-
-> **Note:** `setup` requires `sudo` for DNS resolver, dnsmasq, and Nginx. You'll be prompted once.
-
-### Proxy users (Surge, ClashX, etc.)
-
-If you use a system proxy, add `*.loc.wp` to your skip-proxy list. Otherwise HTTPS requests to local sites will be routed through the proxy and fail.
+- Installs Homebrew packages: PHP, Caddy, WP-CLI
+- Writes a Caddyfile that imports per-site configs
+- Starts Caddy and PHP-FPM as user-level services (no sudo needed)
 
 ## Usage
 
@@ -95,9 +86,9 @@ Site names: lowercase letters, digits, and hyphens. Cannot start or end with a h
 
 ```bash
 locwp list                          # list all sites with status (alias: ls)
-locwp stop <name>                   # stop a site (nginx vhost disabled)
+locwp stop <name>                   # stop a site (Caddy conf disabled)
 locwp start <name>                  # start a stopped site
-locwp delete <name>                 # delete site, database, and all configs (alias: rm)
+locwp delete <name>                 # delete site and all configs (alias: rm)
 ```
 
 ### WP-CLI
@@ -115,31 +106,28 @@ locwp wp <name> -- user list
 
 ```
 ~/.locwp/
-  ssl/
-    _wildcard.loc.wp.pem          # SSL certificate
-    _wildcard.loc.wp-key.pem      # SSL key
+  caddy/
+    sites/
+      mysite.caddy                 # Caddy site config (port 10001)
   sites/
     mysite/
-      config.json                  # site configuration
+      config.json                  # site configuration (includes port)
       wordpress/                   # WordPress files
-      logs/                        # Nginx & PHP logs
+      logs/                        # Caddy & PHP logs
       .pawl/workflows/
         provision.json             # initial setup workflow
         start.json                 # start site workflow
         stop.json                  # stop site workflow
         destroy.json               # teardown workflow
-  nginx/
-    sites/
-      mysite.conf                  # Nginx vhost (HTTPS)
   php/
     mysite.conf                    # PHP-FPM pool config
 ```
 
 Each site gets:
-- An Nginx vhost with HTTPS (`*.loc.wp` wildcard cert)
+- A Caddy site block on its own port (`http://localhost:<port>`)
 - A dedicated PHP-FPM pool with Unix socket (`/tmp/locwp-<name>.sock`)
-- A MariaDB database (`wp_<name>`, hyphens converted to underscores)
-- WordPress installed and configured
+- A SQLite database (`wp-content/database/.ht.sqlite`)
+- WordPress installed and configured via the [SQLite Database Integration](https://wordpress.org/plugins/sqlite-database-integration/) plugin
 - Four pawl workflows for its full lifecycle
 
 Workflows are plain JSON — edit them to add custom steps (install plugins, import data, seed content) without touching Go code.
