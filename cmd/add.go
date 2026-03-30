@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
+	"strconv"
 
 	"github.com/spf13/cobra"
 	"github.com/yansircc/locwp/internal/config"
@@ -21,32 +21,23 @@ var (
 	flagAdminEmail string
 )
 
-var namePattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
-
 var addCmd = &cobra.Command{
-	Use:   "add <name>",
+	Use:   "add",
 	Short: "Add a new local WordPress site",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		name := args[0]
-
-		// Validate site name
-		if !namePattern.MatchString(name) {
-			return fmt.Errorf("invalid site name %q: only lowercase letters, digits, and hyphens allowed (cannot start/end with hyphen)", name)
-		}
-
 		baseDir := config.BaseDir()
-		siteDir := filepath.Join(baseDir, "sites", name)
-
-		if _, err := os.Stat(siteDir); err == nil {
-			return fmt.Errorf("site %q already exists", name)
-		}
 
 		// Allocate next available port
 		port := config.NextPort(baseDir)
+		portStr := strconv.Itoa(port)
+		siteDir := filepath.Join(baseDir, "sites", portStr)
+
+		if _, err := os.Stat(siteDir); err == nil {
+			return fmt.Errorf("site %s already exists", portStr)
+		}
 
 		sc := &site.Config{
-			Name:       name,
 			Port:       port,
 			PHP:        flagPHP,
 			WPVer:      "latest",
@@ -74,7 +65,7 @@ var addCmd = &cobra.Command{
 		if err := os.MkdirAll(caddySitesDir, 0755); err != nil {
 			return err
 		}
-		caddyConfPath := filepath.Join(caddySitesDir, name+".caddy")
+		caddyConfPath := filepath.Join(caddySitesDir, portStr+".caddy")
 		if err := template.WriteCaddyConf(caddyConfPath, sc); err != nil {
 			return err
 		}
@@ -84,14 +75,14 @@ var addCmd = &cobra.Command{
 		if err := os.MkdirAll(phpDir, 0755); err != nil {
 			return err
 		}
-		if err := template.WriteFPMPool(filepath.Join(phpDir, name+".conf"), sc); err != nil {
+		if err := template.WriteFPMPool(filepath.Join(phpDir, portStr+".conf"), sc); err != nil {
 			return err
 		}
 
 		// Install pool config into Homebrew PHP-FPM pool.d
 		fpmPoolDir := template.FPMPoolDir(sc.PHP)
 		if _, err := os.Stat(fpmPoolDir); err == nil {
-			if err := template.WriteFPMPool(filepath.Join(fpmPoolDir, "locwp-"+name+".conf"), sc); err != nil {
+			if err := template.WriteFPMPool(filepath.Join(fpmPoolDir, "locwp-"+portStr+".conf"), sc); err != nil {
 				return fmt.Errorf("write FPM pool to %s: %w", fpmPoolDir, err)
 			}
 		}
@@ -105,7 +96,7 @@ var addCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Site %q configured (%s, PHP %s)\n", name, sc.URL(), flagPHP)
+		fmt.Printf("Site configured (%s, PHP %s)\n", sc.URL(), flagPHP)
 
 		if flagNoStart {
 			return nil

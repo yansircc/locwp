@@ -19,8 +19,6 @@ func HomebrewPrefix() string {
 }
 
 // PHPFormulaName returns the Homebrew formula name for a PHP version.
-// For PHP 8.3 (the default Homebrew PHP), it returns "php".
-// For other versions, it returns "php@X.Y".
 func PHPFormulaName(version string) string {
 	if version == "" {
 		version = config.DefaultPHP
@@ -35,10 +33,10 @@ func FPMPoolDir(version string) string {
 }
 
 func WriteFPMPool(path string, sc *site.Config) error {
-	pool := fmt.Sprintf(`[%s]
+	pool := fmt.Sprintf(`[locwp-%d]
 user = %s
 group = staff
-listen = /tmp/locwp-%s.sock
+listen = /tmp/locwp-%d.sock
 listen.owner = %s
 listen.group = staff
 listen.mode = 0660
@@ -48,7 +46,7 @@ pm.max_children = 5
 pm.process_idle_timeout = 10s
 
 php_admin_value[error_log] = %s/logs/php-error.log
-`, sc.Name, os.Getenv("USER"), sc.Name, os.Getenv("USER"), sc.SiteDir)
+`, sc.Port, os.Getenv("USER"), sc.Port, os.Getenv("USER"), sc.SiteDir)
 
 	return os.WriteFile(path, []byte(pool), 0644)
 }

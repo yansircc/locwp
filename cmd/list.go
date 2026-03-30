@@ -20,7 +20,7 @@ var listCmd = &cobra.Command{
 		entries, err := os.ReadDir(sitesDir)
 		if err != nil {
 			if os.IsNotExist(err) {
-				fmt.Println("No sites yet. Run `locwp add <name>` to create one.")
+				fmt.Println("No sites yet. Run `locwp add` to create one.")
 				return nil
 			}
 			return err
@@ -34,12 +34,12 @@ var listCmd = &cobra.Command{
 			}
 		}
 		if len(dirs) == 0 {
-			fmt.Println("No sites yet. Run `locwp add <name>` to create one.")
+			fmt.Println("No sites yet. Run `locwp add` to create one.")
 			return nil
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "NAME\tURL\tPHP\tSTATUS\tPATH")
+		fmt.Fprintln(w, "PORT\tURL\tPHP\tSTATUS\tPATH")
 		for _, e := range dirs {
 			sc, err := site.Load(filepath.Join(sitesDir, e.Name()))
 			if err != nil {
@@ -47,7 +47,7 @@ var listCmd = &cobra.Command{
 				continue
 			}
 			status := site.Status(sc)
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", sc.Name, sc.URL(), sc.PHP, status, sc.WPRoot)
+			fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", sc.Port, sc.URL(), sc.PHP, status, sc.WPRoot)
 		}
 		return w.Flush()
 	},

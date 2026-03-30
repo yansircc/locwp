@@ -7,7 +7,6 @@ import (
 
 func newTestConfig(dir string) *Config {
 	return &Config{
-		Name:    "testsite",
 		Port:    10001,
 		PHP:     "8.3",
 		WPVer:   "latest",
@@ -29,9 +28,6 @@ func TestSaveAndLoad(t *testing.T) {
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	if loaded.Name != sc.Name {
-		t.Errorf("Name = %q, want %q", loaded.Name, sc.Name)
-	}
 	if loaded.Port != sc.Port {
 		t.Errorf("Port = %d, want %d", loaded.Port, sc.Port)
 	}
@@ -66,5 +62,12 @@ func TestURL(t *testing.T) {
 	want := "http://localhost:10005"
 	if got := sc.URL(); got != want {
 		t.Errorf("URL() = %q, want %q", got, want)
+	}
+}
+
+func TestPortStr(t *testing.T) {
+	sc := &Config{Port: 10001}
+	if got := sc.PortStr(); got != "10001" {
+		t.Errorf("PortStr() = %q, want \"10001\"", got)
 	}
 }

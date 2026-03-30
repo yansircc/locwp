@@ -62,28 +62,23 @@ assert_http_status() {
 }
 
 # ─── Helpers ─────────────────────────────────────────────
-# Read port from a site's config.json
+# Read port from a site's config.json by directory name (port)
 site_port() {
-  local name="$1"
-  python3 -c "import json; print(json.load(open('$LOCWP_HOME/sites/$name/config.json'))['port'])" 2>/dev/null
+  local port="$1"
+  python3 -c "import json; print(json.load(open('$LOCWP_HOME/sites/$port/config.json'))['port'])" 2>/dev/null
 }
 
-# Build the site URL from name
+# Build the site URL from port
 site_url() {
-  local name="$1"
-  local port
-  port=$(site_port "$name")
-  echo "http://localhost:$port"
+  echo "http://localhost:$1"
 }
 
 # ─── Command execution ───────────────────────────────────
-# Run command and capture output to $TMPOUT (stdout+stderr)
 run_cmd() {
   "$@" > "$TMPOUT" 2>&1
   return $?
 }
 
-# Run command and capture output to $TMPOUT, also print to terminal
 run_capture() {
   "$@" > "$TMPOUT" 2>&1
   local rc=$?
@@ -98,12 +93,10 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# Build binary
 build_binary() {
   (cd "$PROJECT_DIR" && go build -o locwp .)
 }
 
-# Print test summary
 print_summary() {
   local total_end elapsed
   total_end=$(date +%s)

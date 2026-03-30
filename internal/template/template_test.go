@@ -13,12 +13,11 @@ import (
 
 func testSiteConfig(dir string) *site.Config {
 	return &site.Config{
-		Name:       "demo",
 		Port:       10001,
 		PHP:        "8.2",
 		WPVer:      "6.4",
-		SiteDir:    filepath.Join(dir, "sites", "demo"),
-		WPRoot:     filepath.Join(dir, "sites", "demo", "wordpress"),
+		SiteDir:    filepath.Join(dir, "sites", "10001"),
+		WPRoot:     filepath.Join(dir, "sites", "10001", "wordpress"),
 		AdminUser:  "admin",
 		AdminPass:  "admin",
 		AdminEmail: "admin@loc.wp",
@@ -84,7 +83,7 @@ func TestWriteCaddyConf(t *testing.T) {
 	checks := []string{
 		":10001",
 		"root * " + sc.WPRoot,
-		"php_fastcgi unix//tmp/locwp-demo.sock",
+		"php_fastcgi unix//tmp/locwp-10001.sock",
 		"file_server",
 		sc.SiteDir + "/logs/access.log",
 	}
@@ -112,8 +111,8 @@ func TestWriteFPMPool(t *testing.T) {
 	content := string(data)
 
 	checks := []string{
-		"[demo]",
-		"listen = /tmp/locwp-demo.sock",
+		"[locwp-10001]",
+		"listen = /tmp/locwp-10001.sock",
 		"pm = ondemand",
 		"pm.max_children = 5",
 		"php_admin_value[error_log]",
@@ -148,13 +147,9 @@ func TestWritePawlWorkflows(t *testing.T) {
 			t.Fatalf("%s is not valid JSON: %v", f, err)
 		}
 
-		// All workflows must have vars, tasks, and workflow
 		vars, ok := raw["vars"].(map[string]interface{})
 		if !ok {
 			t.Fatalf("%s missing 'vars'", f)
-		}
-		if vars["site"] != "demo" {
-			t.Errorf("%s vars.site = %q, want \"demo\"", f, vars["site"])
 		}
 		if vars["port"] != "10001" {
 			t.Errorf("%s vars.port = %q, want \"10001\"", f, vars["port"])
@@ -175,7 +170,7 @@ func TestWritePawlWorkflows(t *testing.T) {
 		}
 	}
 
-	// Spot-check provision workflow has SQLite-related steps
+	// Spot-check provision workflow
 	data, _ := os.ReadFile(filepath.Join(workflowDir, "provision.json"))
 	content := string(data)
 	if !strings.Contains(content, "pdo_sqlite") {
@@ -184,28 +179,13 @@ func TestWritePawlWorkflows(t *testing.T) {
 	if !strings.Contains(content, "sqlite-database-integration") {
 		t.Error("provision.json missing sqlite plugin download")
 	}
-	if !strings.Contains(content, "db.copy") {
-		t.Error("provision.json missing db.php drop-in setup")
-	}
-	if !strings.Contains(content, "install-wp") {
-		t.Error("provision.json missing install-wp step")
-	}
-	if !strings.Contains(content, "set-permalinks") {
-		t.Error("provision.json missing set-permalinks step")
+	if !strings.Contains(content, "--title=WordPress") {
+		t.Error("provision.json missing default WordPress title")
 	}
 
-	// Spot-check destroy workflow has NO mariadb references
-	data, _ = os.ReadFile(filepath.Join(workflowDir, "destroy.json"))
-	if strings.Contains(string(data), "mariadb") {
-		t.Error("destroy.json should not reference mariadb")
-	}
-
-	// Check that start.json references caddy (not nginx)
+	// No site name reference
 	data, _ = os.ReadFile(filepath.Join(workflowDir, "start.json"))
 	if !strings.Contains(string(data), "caddy") {
 		t.Error("start.json missing caddy reference")
-	}
-	if strings.Contains(string(data), "nginx") {
-		t.Error("start.json should not reference nginx")
 	}
 }

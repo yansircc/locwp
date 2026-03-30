@@ -11,7 +11,7 @@ import (
 func WriteCaddyConf(path string, sc *site.Config) error {
 	conf := fmt.Sprintf(`:%d {
 	root * %s
-	php_fastcgi unix//tmp/locwp-%s.sock
+	php_fastcgi unix//tmp/locwp-%d.sock
 	file_server
 	encode gzip
 
@@ -19,7 +19,7 @@ func WriteCaddyConf(path string, sc *site.Config) error {
 		output file %s/logs/access.log
 	}
 }
-`, sc.Port, sc.WPRoot, sc.Name, sc.SiteDir)
+`, sc.Port, sc.WPRoot, sc.Port, sc.SiteDir)
 
 	return os.WriteFile(path, []byte(conf), 0644)
 }

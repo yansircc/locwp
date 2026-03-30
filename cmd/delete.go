@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/spf13/cobra"
 	"github.com/yansircc/locwp/internal/exec"
@@ -10,13 +11,16 @@ import (
 )
 
 var deleteCmd = &cobra.Command{
-	Use:     "delete <name>",
+	Use:     "delete <port>",
 	Aliases: []string{"rm"},
-	Short:   "Delete a WordPress site and its database",
+	Short:   "Delete a WordPress site",
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		name := args[0]
-		sc, err := site.LoadByName(name)
+		port, err := strconv.Atoi(args[0])
+		if err != nil {
+			return fmt.Errorf("invalid port %q: %w", args[0], err)
+		}
+		sc, err := site.LoadByPort(port)
 		if err != nil {
 			return err
 		}
@@ -24,10 +28,10 @@ var deleteCmd = &cobra.Command{
 		// Run destroy workflow (removes Caddy/FPM configs, reloads Caddy)
 		_ = exec.RunInDir(sc.SiteDir, "pawl", "start", "destroy")
 
-		// Remove site directory (pawl can't delete its own working directory)
+		// Remove site directory
 		os.RemoveAll(sc.SiteDir)
 
-		fmt.Printf("Site %q deleted.\n", name)
+		fmt.Printf("Site %d deleted.\n", sc.Port)
 		return nil
 	},
 }

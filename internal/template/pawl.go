@@ -2,7 +2,6 @@ package template
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -32,22 +31,22 @@ const sqlitePluginURL = "https://downloads.wordpress.org/plugin/sqlite-database-
 func WritePawlWorkflows(workflowDir string, sc *site.Config) error {
 	prefix := HomebrewPrefix()
 	phpBin := filepath.Join(prefix, "opt", "php@"+sc.PHP, "bin", "php")
+	portStr := sc.PortStr()
 	baseDir := filepath.Dir(filepath.Dir(sc.SiteDir))
 
 	vars := map[string]string{
-		"site":             sc.Name,
-		"port":             fmt.Sprintf("%d", sc.Port),
-		"wp_root":          sc.WPRoot,
-		"wp_ver":           sc.WPVer,
-		"php_ver":          sc.PHP,
-		"php_bin":          phpBin,
-		"site_dir":         sc.SiteDir,
-		"admin_user":       sc.AdminUser,
-		"admin_pass":       sc.AdminPass,
-		"admin_email":      sc.AdminEmail,
-		"caddy_conf":       filepath.Join(config.CaddySitesDir(), sc.Name+".caddy"),
-		"fpm_local":        filepath.Join(baseDir, "php", sc.Name+".conf"),
-		"fpm_pool":         filepath.Join(FPMPoolDir(sc.PHP), "locwp-"+sc.Name+".conf"),
+		"port":              portStr,
+		"wp_root":           sc.WPRoot,
+		"wp_ver":            sc.WPVer,
+		"php_ver":           sc.PHP,
+		"php_bin":           phpBin,
+		"site_dir":          sc.SiteDir,
+		"admin_user":        sc.AdminUser,
+		"admin_pass":        sc.AdminPass,
+		"admin_email":       sc.AdminEmail,
+		"caddy_conf":        filepath.Join(config.CaddySitesDir(), portStr+".caddy"),
+		"fpm_local":         filepath.Join(baseDir, "php", portStr+".conf"),
+		"fpm_pool":          filepath.Join(FPMPoolDir(sc.PHP), "locwp-"+portStr+".conf"),
 		"sqlite_plugin_url": sqlitePluginURL,
 	}
 
@@ -67,7 +66,7 @@ func WritePawlWorkflows(workflowDir string, sc *site.Config) error {
 				{Name: "gen-wp-config", Run: "${php_bin} -d memory_limit=512M $(which wp) config create --path=${wp_root} --dbname=wordpress --dbuser=unused --dbhost=unused --skip-check"},
 				{Name: "configure-sqlite", Run: "${php_bin} -d memory_limit=512M $(which wp) config set DB_DIR ${wp_root}/wp-content/database --path=${wp_root} --type=constant && ${php_bin} -d memory_limit=512M $(which wp) config set DB_FILE .ht.sqlite --path=${wp_root} --type=constant"},
 				{Name: "provision-services", Run: "brew services restart php@${php_ver} 2>/dev/null; brew services restart caddy", OnFail: "retry"},
-				{Name: "install-wp", Run: "${php_bin} -d memory_limit=512M $(which wp) core install --path=${wp_root} --url=http://localhost:${port} --title=${site} --admin_user=${admin_user} --admin_password=${admin_pass} --admin_email=${admin_email}", OnFail: "retry"},
+				{Name: "install-wp", Run: "${php_bin} -d memory_limit=512M $(which wp) core install --path=${wp_root} --url=http://localhost:${port} --title=WordPress --admin_user=${admin_user} --admin_password=${admin_pass} --admin_email=${admin_email}", OnFail: "retry"},
 				{Name: "set-permalinks", Run: "${php_bin} -d memory_limit=512M $(which wp) rewrite structure '/%postname%/' --path=${wp_root} && ${php_bin} -d memory_limit=512M $(which wp) rewrite flush --path=${wp_root}"},
 			},
 		},

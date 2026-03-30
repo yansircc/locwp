@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/spf13/cobra"
 	"github.com/yansircc/locwp/internal/exec"
@@ -9,11 +10,15 @@ import (
 )
 
 var stopCmd = &cobra.Command{
-	Use:   "stop <name>",
+	Use:   "stop <port>",
 	Short: "Stop a WordPress site",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		sc, err := site.LoadByName(args[0])
+		port, err := strconv.Atoi(args[0])
+		if err != nil {
+			return fmt.Errorf("invalid port %q: %w", args[0], err)
+		}
+		sc, err := site.LoadByPort(port)
 		if err != nil {
 			return err
 		}
@@ -22,7 +27,7 @@ var stopCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Site %q stopped\n", sc.Name)
+		fmt.Printf("Site %d stopped\n", sc.Port)
 		return nil
 	},
 }

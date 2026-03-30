@@ -1,10 +1,10 @@
 # LOCWP
 
-Local WordPress site manager for macOS. Create and manage WordPress development sites on localhost with per-site ports — zero sudo, zero configuration, powered by native Homebrew services.
+Local WordPress site manager for macOS. Zero sudo, zero configuration — just `locwp add` and go.
 
 ```bash
-locwp setup              # one-time: install PHP, Caddy, WP-CLI
-locwp add mysite         # creates http://localhost:10001 with WordPress ready to go
+locwp setup          # one-time: install PHP, Caddy, WP-CLI
+locwp add            # creates http://localhost:10001 with WordPress ready to go
 ```
 
 Built on [pawl](https://github.com/yansircc/pawl) — all site lifecycle operations are declarative JSON workflows with built-in retry, progress display, and error handling.
@@ -13,9 +13,9 @@ Built on [pawl](https://github.com/yansircc/pawl) — all site lifecycle operati
 
 - **Zero sudo** — no root required, everything runs as your user
 - **One-command setup** — `locwp setup` installs and configures everything
-- **Per-site ports** — each site gets its own `http://localhost:<port>` (starting from 10001)
-- **Per-site PHP** — choose PHP 8.1, 8.2, or 8.3 per site
+- **Port-based** — each site gets its own `http://localhost:<port>` (auto-assigned from 10001)
 - **SQLite database** — no daemon, no service, DB is just a file inside the site directory
+- **Per-site PHP** — choose PHP 8.1, 8.2, or 8.3 per site
 - **Full lifecycle** — add, start, stop, delete with clean teardown
 - **WP-CLI passthrough** — run any wp command against any site
 - **Editable workflows** — pawl JSON workflows are plain files you can customize
@@ -47,7 +47,7 @@ go build -o locwp .
 locwp setup
 
 # 2. Create your first site
-locwp add mysite --pass secret123
+locwp add --pass secret123
 
 # 3. Done! Open in browser
 open http://localhost:10001
@@ -66,13 +66,13 @@ WordPress admin login: `http://localhost:10001/wp-admin/` (default user: `admin`
 ### Create a site
 
 ```bash
-locwp add <name>                    # create + provision + start
-locwp add <name> --pass secret123   # set WordPress admin password
-locwp add <name> --php 8.2          # use PHP 8.2
-locwp add <name> --no-start         # create config only, don't provision
+locwp add                           # create + provision + start
+locwp add --pass secret123          # set WordPress admin password
+locwp add --php 8.2                 # use PHP 8.2
+locwp add --no-start                # create config only, don't provision
 ```
 
-Site names: lowercase letters, digits, and hyphens. Cannot start or end with a hyphen.
+Each site is identified by its port number (auto-assigned starting from 10001).
 
 | Flag | Description | Default |
 |---|---|---|
@@ -86,9 +86,9 @@ Site names: lowercase letters, digits, and hyphens. Cannot start or end with a h
 
 ```bash
 locwp list                          # list all sites with status (alias: ls)
-locwp stop <name>                   # stop a site (Caddy conf disabled)
-locwp start <name>                  # start a stopped site
-locwp delete <name>                 # delete site and all configs (alias: rm)
+locwp stop 10001                    # stop a site
+locwp start 10001                   # start a stopped site
+locwp delete 10001                  # delete site and all configs (alias: rm)
 ```
 
 ### WP-CLI
@@ -96,10 +96,10 @@ locwp delete <name>                 # delete site and all configs (alias: rm)
 Run any WP-CLI command against a site:
 
 ```bash
-locwp wp <name> -- option get siteurl
-locwp wp <name> -- plugin list
-locwp wp <name> -- theme activate twentytwentyfour
-locwp wp <name> -- user list
+locwp wp 10001 -- option get siteurl
+locwp wp 10001 -- plugin list
+locwp wp 10001 -- theme activate twentytwentyfour
+locwp wp 10001 -- user list
 ```
 
 ## How It Works
@@ -108,29 +108,29 @@ locwp wp <name> -- user list
 ~/.locwp/
   caddy/
     sites/
-      mysite.caddy                 # Caddy site config (port 10001)
+      10001.caddy                  # Caddy site config (port 10001)
   sites/
-    mysite/
-      config.json                  # site configuration (includes port)
+    10001/
+      config.json                  # site configuration
       wordpress/                   # WordPress files
       logs/                        # Caddy & PHP logs
       .pawl/workflows/
-        provision.json             # initial setup workflow
-        start.json                 # start site workflow
-        stop.json                  # stop site workflow
-        destroy.json               # teardown workflow
+        provision.json
+        start.json
+        stop.json
+        destroy.json
   php/
-    mysite.conf                    # PHP-FPM pool config
+    10001.conf                     # PHP-FPM pool config
 ```
 
 Each site gets:
 - A Caddy site block on its own port (`http://localhost:<port>`)
-- A dedicated PHP-FPM pool with Unix socket (`/tmp/locwp-<name>.sock`)
+- A dedicated PHP-FPM pool with Unix socket (`/tmp/locwp-<port>.sock`)
 - A SQLite database (`wp-content/database/.ht.sqlite`)
-- WordPress installed and configured via the [SQLite Database Integration](https://wordpress.org/plugins/sqlite-database-integration/) plugin
+- WordPress installed via the [SQLite Database Integration](https://wordpress.org/plugins/sqlite-database-integration/) plugin
 - Four pawl workflows for its full lifecycle
 
-Workflows are plain JSON — edit them to add custom steps (install plugins, import data, seed content) without touching Go code.
+Workflows are plain JSON — edit them to add custom steps without touching Go code.
 
 ### Environment Variables
 
@@ -147,7 +147,7 @@ go test ./...
 # E2E tests (full setup → add → verify → lifecycle)
 bash scripts/test-e2e.sh
 
-# Edge case tests (boundary names, idempotency, filesystem corruption, etc.)
+# Edge case tests (idempotency, invalid args, rapid cycles, etc.)
 bash scripts/test-edge.sh
 ```
 
