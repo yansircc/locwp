@@ -56,6 +56,13 @@ var setupCmd = &cobra.Command{
 			_ = exec.Run("brew", "link", "--force", "--overwrite", phpFormula)
 		}
 
+		// Configure PHP limits for WordPress
+		fmt.Println("\nConfiguring PHP...")
+		if err := template.WritePHPConf(flagSetupPHP); err != nil {
+			return fmt.Errorf("failed to configure PHP: %w", err)
+		}
+		fmt.Println("  [ok] PHP limits configured")
+
 		// Start user-level services (no sudo)
 		fmt.Println("\nStarting services...")
 		_ = exec.Run("brew", "services", "restart", phpFormula)

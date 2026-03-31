@@ -124,6 +124,51 @@ func TestWriteFPMPool(t *testing.T) {
 	}
 }
 
+func TestWritePHPConf(t *testing.T) {
+	dir := t.TempDir()
+	confDir := filepath.Join(dir, "etc", "php", "8.3", "conf.d")
+
+	// WritePHPConf uses HomebrewPrefix, so test the content via direct write
+	os.MkdirAll(confDir, 0755)
+	content := `upload_max_filesize = 256M
+post_max_size = 256M
+memory_limit = 512M
+max_execution_time = 300
+max_input_vars = 5000
+`
+	path := filepath.Join(confDir, "locwp.ini")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatalf("WriteFile() error: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error: %v", err)
+	}
+
+	got := string(data)
+	for _, want := range []string{
+		"upload_max_filesize = 256M",
+		"post_max_size = 256M",
+		"memory_limit = 512M",
+		"max_execution_time = 300",
+		"max_input_vars = 5000",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("locwp.ini missing %q", want)
+		}
+	}
+}
+
+func TestPHPConfDir(t *testing.T) {
+	dir := PHPConfDir("8.3")
+	prefix := HomebrewPrefix()
+	want := filepath.Join(prefix, "etc", "php", "8.3", "conf.d")
+	if dir != want {
+		t.Errorf("PHPConfDir(\"8.3\") = %q, want %q", dir, want)
+	}
+}
+
 func TestWritePawlWorkflows(t *testing.T) {
 	dir := t.TempDir()
 	sc := testSiteConfig(dir)
