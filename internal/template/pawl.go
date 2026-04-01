@@ -61,8 +61,8 @@ func WritePawlWorkflows(workflowDir string, sc *site.Config) error {
 			steps: []pawlStep{
 				{Name: "check-deps", Run: "test -x ${php_bin} && which caddy wp && ${php_bin} -m | grep -q pdo_sqlite"},
 				{Name: "download-wp", Run: "${php_bin} -d memory_limit=512M $(which wp) core download --path=${wp_root} --version=${wp_ver}", OnFail: "retry"},
-				{Name: "download-sqlite-plugin", Run: "curl -sL ${sqlite_plugin_url} -o /tmp/locwp-sqlite-plugin.zip && unzip -qo /tmp/locwp-sqlite-plugin.zip -d ${wp_root}/wp-content/plugins/ && rm -f /tmp/locwp-sqlite-plugin.zip", OnFail: "retry"},
-				{Name: "setup-db-dropin", Run: "cp ${wp_root}/wp-content/plugins/sqlite-database-integration/db.copy ${wp_root}/wp-content/db.php && mkdir -p ${wp_root}/wp-content/database"},
+				{Name: "download-sqlite-plugin", Run: "mkdir -p ${wp_root}/wp-content/mu-plugins && curl -sL ${sqlite_plugin_url} -o /tmp/locwp-sqlite-plugin.zip && unzip -qo /tmp/locwp-sqlite-plugin.zip -d ${wp_root}/wp-content/mu-plugins/ && rm -f /tmp/locwp-sqlite-plugin.zip", OnFail: "retry"},
+				{Name: "setup-db-dropin", Run: "cp ${wp_root}/wp-content/mu-plugins/sqlite-database-integration/db.copy ${wp_root}/wp-content/db.php && sed -i '' \"s|/plugins/sqlite-database-integration|/mu-plugins/sqlite-database-integration|\" ${wp_root}/wp-content/db.php && mkdir -p ${wp_root}/wp-content/database"},
 				{Name: "gen-wp-config", Run: "${php_bin} -d memory_limit=512M $(which wp) config create --path=${wp_root} --dbname=wordpress --dbuser=unused --dbhost=unused --skip-check"},
 				{Name: "configure-sqlite", Run: "${php_bin} -d memory_limit=512M $(which wp) config set DB_DIR ${wp_root}/wp-content/database --path=${wp_root} --type=constant && ${php_bin} -d memory_limit=512M $(which wp) config set DB_FILE .ht.sqlite --path=${wp_root} --type=constant"},
 				{Name: "provision-services", Run: "brew services restart php@${php_ver} 2>/dev/null; brew services restart caddy", OnFail: "retry"},
